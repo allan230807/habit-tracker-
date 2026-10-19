@@ -1,4 +1,4 @@
-const CACHE = "party-habit-v1";
+const CACHE = "habit-tracker-v1";
 
 self.addEventListener("install", () => self.skipWaiting());
 

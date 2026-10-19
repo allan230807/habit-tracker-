@@ -7,7 +7,9 @@ import type {
   StatKey,
 } from "./types";
 
-export const STORAGE_KEY = "party-habit:v1";
+export const STORAGE_KEY = "habit-tracker:v1";
+/** Clave de la versión anterior (Party Habit): se migra al primer arranque. */
+export const LEGACY_STORAGE_KEY = "party-habit:v1";
 
 export const SPRITE_STATES: SpriteState[] = [
   "durmiendo",
@@ -19,19 +21,19 @@ export const SPRITE_STATES: SpriteState[] = [
 ];
 
 export const SPRITE_LABELS: Record<SpriteState, string> = {
-  durmiendo: "DURMIENDO",
-  scrolling_phone: "SCROLLING",
-  reading_bed: "LEYENDO",
-  praying: "ORANDO",
-  writing_board: "PLANEANDO",
-  working_macbook: "TRABAJANDO",
+  durmiendo: "Durmiendo",
+  scrolling_phone: "Con el celular",
+  reading_bed: "Leyendo",
+  praying: "Orando",
+  writing_board: "Planeando",
+  working_macbook: "Trabajando",
 };
 
 export const STAT_LABELS: Record<StatKey, string> = {
-  fuerza: "FUERZA",
-  inteligencia: "INTELIGENCIA",
-  espiritu: "ESPÍRITU",
-  disciplina: "DISCIPLINA",
+  fuerza: "Fuerza",
+  inteligencia: "Inteligencia",
+  espiritu: "Espíritu",
+  disciplina: "Disciplina",
 };
 
 export const QUICK_ACTIONS = [
@@ -109,7 +111,7 @@ export function createInitialState(now: Date): GameState {
     transactions: [],
     inventory: [],
     tomorrowTasks: [],
-    timer: null,
+    stopwatch: null,
   });
 }
 
@@ -117,7 +119,10 @@ export function createInitialState(now: Date): GameState {
 export function hydrate(raw: unknown, now: Date): GameState {
   const base = createInitialState(now);
   if (!raw || typeof raw !== "object") return base;
-  const s = { ...base, ...(raw as Partial<GameState>) };
+  const saved = { ...(raw as Record<string, unknown>) };
+  delete saved.timer; // el temporizador de la versión anterior ya no existe
+  const s = { ...base, ...(saved as Partial<GameState>) };
+  if (s.currentState && !SPRITE_STATES.includes(s.currentState)) s.currentState = base.currentState;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s.appStartDate)) s.appStartDate = base.appStartDate;
   return recompute(s);
 }
@@ -157,6 +162,27 @@ export function recompute(s: GameState): GameState {
 }
 
 export const hasGamerDesk = (s: GameState) => s.goals.some((g) => g.targetHours > 0 && g.currentHours >= g.targetHours);
+
+/** Nivel 0..4 de un día según la fracción de hábitos completados. */
+export function heatLevel(count: number, total: number) {
+  if (!count || !total) return 0;
+  const r = count / total;
+  return r >= 1 ? 4 : r > 0.67 ? 3 : r > 0.34 ? 2 : 1;
+}
+
+/** Últimas `weeks` semanas (columnas, domingo→sábado). null = día futuro. */
+export function heatLevels(s: GameState, today: string, weeks: number): (number | null)[][] {
+  const lastSat = addDays(today, 6 - weekday(today));
+  const start = addDays(lastSat, -(weeks * 7 - 1));
+  const counts = new Map<string, number>();
+  for (const h of s.habits) for (const d of h.history) counts.set(d, (counts.get(d) ?? 0) + 1);
+  return Array.from({ length: weeks }, (_, w) =>
+    Array.from({ length: 7 }, (_, d) => {
+      const key = addDays(start, w * 7 + d);
+      return key > today ? null : heatLevel(counts.get(key) ?? 0, s.habits.length);
+    }),
+  );
+}
 
 export function habitSuccess(s: GameState, h: Habit, today: string) {
   const days = dayNumber(s, today);
@@ -205,34 +231,36 @@ export function addGoal(s: GameState, name: string, targetHours: number) {
 }
 
 export function removeGoal(s: GameState, id: string) {
-  const timer = s.timer?.goalId === id ? null : s.timer;
-  const currentState = s.timer && !timer ? s.timer.prevState : s.currentState;
-  return recompute({ ...s, goals: s.goals.filter((g) => g.id !== id), timer, currentState });
+  const stopwatch = s.stopwatch?.goalId === id ? null : s.stopwatch;
+  const currentState = s.stopwatch && !stopwatch ? s.stopwatch.prevState : s.currentState;
+  return recompute({ ...s, goals: s.goals.filter((g) => g.id !== id), stopwatch, currentState });
 }
 
 export const setSprite = (s: GameState, currentState: SpriteState) =>
-  s.timer ? s : { ...s, currentState };
+  s.stopwatch ? s : { ...s, currentState };
 
-export function startTimer(s: GameState, goalId: string, minutes: number, nowMs: number) {
-  if (s.timer || !(minutes > 0) || !s.goals.some((g) => g.id === goalId)) return s;
+export function startStopwatch(s: GameState, goalId: string, nowMs: number): GameState {
+  if (s.stopwatch || !s.goals.some((g) => g.id === goalId)) return s;
   return {
     ...s,
-    currentState: "working_macbook" as const,
-    timer: { goalId, durationMin: minutes, startedAt: nowMs, endsAt: nowMs + minutes * 60000, prevState: s.currentState },
+    currentState: "working_macbook",
+    stopwatch: { goalId, startedAt: nowMs, prevState: s.currentState },
   };
 }
 
-export function completeTimer(s: GameState) {
-  const t = s.timer;
-  if (!t) return s;
+/** Detiene el cronómetro y suma el tiempo transcurrido a la meta. */
+export function stopStopwatch(s: GameState, nowMs: number): GameState {
+  const w = s.stopwatch;
+  if (!w) return s;
+  const hours = Math.max(0, nowMs - w.startedAt) / 3_600_000;
   const goals = s.goals.map((g) =>
-    g.id === t.goalId ? { ...g, currentHours: Math.round((g.currentHours + t.durationMin / 60) * 10000) / 10000 } : g,
+    g.id === w.goalId ? { ...g, currentHours: Math.round((g.currentHours + hours) * 10000) / 10000 } : g,
   );
-  return recompute({ ...s, goals, timer: null, currentState: t.prevState });
+  return recompute({ ...s, goals, stopwatch: null, currentState: w.prevState });
 }
 
-export const cancelTimer = (s: GameState): GameState =>
-  s.timer ? { ...s, timer: null, currentState: s.timer.prevState } : s;
+export const cancelStopwatch = (s: GameState): GameState =>
+  s.stopwatch ? { ...s, stopwatch: null, currentState: s.stopwatch.prevState } : s;
 
 export function addTomorrowTask(s: GameState, text: string, today: string) {
   if (!text.trim()) return s;

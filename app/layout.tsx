@@ -1,22 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { VT323 } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import RegisterSW from "@/components/RegisterSW";
 import "./globals.css";
 
-const vt = VT323({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--font-vt",
-});
+const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Party Habit",
-  description: "Tracker de hábitos, metas y finanzas personales con estética Party Hard.",
-  applicationName: "Party Habit",
+  title: "Habit Tracker",
+  description: "Hábitos, metas y finanzas personales dentro de tu propia habitación.",
+  applicationName: "Habit Tracker",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    title: "Party Habit",
+    title: "Habit Tracker",
     statusBarStyle: "black-translucent",
   },
   formatDetection: { telephone: false },
@@ -24,7 +21,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#050505",
+  themeColor: "#121418",
   colorScheme: "dark",
   width: "device-width",
   initialScale: 1,
@@ -34,7 +31,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="es" className={`${vt.variable} h-full antialiased`}>
+    <html lang="es" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full">
         {children}
         <RegisterSW />

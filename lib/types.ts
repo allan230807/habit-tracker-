@@ -48,11 +48,10 @@ export interface JournalTask {
   completedOn: string | null;
 }
 
-export interface TimerState {
+/** Cronómetro en marcha: suma el tiempo transcurrido a la meta al detenerlo. */
+export interface StopwatchState {
   goalId: string;
-  durationMin: number;
   startedAt: number;
-  endsAt: number;
   prevState: SpriteState;
 }
 
@@ -73,5 +72,5 @@ export interface GameState {
   transactions: Transaction[];
   inventory: InventoryItem[];
   tomorrowTasks: JournalTask[];
-  timer: TimerState | null;
+  stopwatch: StopwatchState | null;
 }

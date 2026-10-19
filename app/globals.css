@@ -1,97 +1,74 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-void: #050505;
-  --color-ink: #0c0c10;
-  --color-panel: #121217;
-  --color-line: #2b2b35;
-  --color-neon-cyan: #00f0ff;
-  --color-neon-magenta: #ff2bd6;
-  --color-neon-lime: #9dff00;
-  --font-mono: var(--font-vt), ui-monospace, "SF Mono", Menlo, monospace;
-  --font-sans: var(--font-mono);
+  --color-bg: #121418;
+  --color-surface: #1a1d23;
+  --color-raised: #222630;
+  --color-line: #2c313b;
+  --color-fg: #e8e6e1;
+  --color-muted: #8b909a;
+  --color-accent: #86b79e;
+  --color-sand: #d6b88a;
+  --color-rose: #cf7f78;
+  --color-sky: #7ea3c4;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 html {
-  background: #050505;
+  background: #121418;
   color-scheme: dark;
 }
 
 body {
-  background: #050505;
-  color: #d4d4d8;
-  font-family: var(--font-mono);
-  font-size: 20px;
-  line-height: 1.15;
+  background: #121418;
+  color: #e8e6e1;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.4;
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
   overscroll-behavior-y: none;
 }
 
-/* scanlines CRT */
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 60;
-  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px);
-}
-
-* {
-  border-radius: 0 !important;
-}
-
 @layer components {
-  .panel {
-    @apply border-4 border-neon-cyan bg-panel p-3 shadow-[4px_4px_0_#000];
+  .card {
+    @apply rounded-2xl border border-line bg-surface p-4;
   }
-  .panel-title {
-    @apply mb-3 text-2xl uppercase tracking-widest text-neon-cyan;
-  }
-  .panel-title::before {
-    content: "> ";
-    color: #ff2bd6;
+  .section-title {
+    @apply mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted;
   }
   .btn {
-    @apply border-2 border-neon-cyan bg-black px-3 py-1.5 uppercase tracking-wide text-neon-cyan
-      transition-none select-none hover:bg-neon-cyan hover:text-black
-      active:translate-x-[2px] active:translate-y-[2px] disabled:cursor-not-allowed disabled:opacity-35
-      disabled:hover:bg-black disabled:hover:text-neon-cyan;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-raised px-3.5 py-2
+      text-sm font-medium text-fg transition-colors select-none hover:border-muted/60 hover:bg-line
+      active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-raised;
   }
-  .btn-lime {
-    @apply border-neon-lime text-neon-lime hover:bg-neon-lime disabled:hover:text-neon-lime;
+  .btn-primary {
+    @apply border-accent/50 bg-accent text-[#10231a] hover:bg-accent/90 hover:border-accent disabled:hover:bg-accent;
   }
-  .btn-magenta {
-    @apply border-neon-magenta text-neon-magenta hover:bg-neon-magenta disabled:hover:text-neon-magenta;
+  .btn-danger {
+    @apply border-rose/40 text-rose hover:bg-rose/10 disabled:hover:bg-raised;
   }
   .input {
-    @apply w-full border-2 border-line bg-black px-2 py-1.5 text-neon-lime placeholder:text-zinc-600
-      focus:border-neon-lime focus:outline-none;
-    font-size: 20px; /* evita el zoom automático de iOS */
+    @apply w-full rounded-xl border border-line bg-bg px-3 py-2 text-fg placeholder:text-muted/70
+      focus:border-accent/70 focus:outline-none;
+    font-size: 16px; /* evita el zoom automático de iOS */
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-medium text-muted;
   }
 }
 
-.glitch {
-  text-shadow: 2px 0 #ff2bd6, -2px 0 #00f0ff;
-}
-
-@keyframes rgb {
-  to {
-    filter: hue-rotate(360deg);
-  }
-}
-.animate-rgb {
-  animation: rgb 3s linear infinite;
-}
-
-@keyframes bob {
+/* respiración sutil del personaje */
+@keyframes breathe {
   50% {
-    transform: translateY(calc(var(--px, 3px) * -1));
+    top: calc(var(--u, 3px) * -1);
   }
 }
-.animate-bob {
-  animation: bob 1s steps(1) infinite;
+.animate-breathe {
+  position: relative;
+  top: 0;
+  animation: breathe 2.4s steps(1) infinite;
 }
 
 @keyframes floaty {
@@ -103,19 +80,58 @@ body::after {
     opacity: 1;
   }
   100% {
-    transform: translateY(-16px);
+    transform: translateY(-14px);
     opacity: 0;
   }
 }
 .animate-floaty {
-  animation: floaty 2.4s steps(6) infinite;
+  animation: floaty 2.6s ease-out infinite;
 }
 
-@keyframes blink {
-  50% {
-    opacity: 0;
+/* auto que cruza la calle por la ventana */
+@keyframes drive {
+  from {
+    transform: translateX(calc(var(--u) * -12));
+  }
+  to {
+    transform: translateX(calc(var(--u) * 26));
   }
 }
-.animate-blink {
-  animation: blink 1s steps(1) infinite;
+.animate-drive {
+  animation: drive 20s linear infinite;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-rise {
+  animation: rise 0.28s ease-out both;
+}
+
+@keyframes fadein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-fadein {
+  animation: fadein 0.3s ease-out both;
+}
+
+@keyframes pulse-dot {
+  50% {
+    opacity: 0.35;
+  }
+}
+.animate-pulse-dot {
+  animation: pulse-dot 1.4s ease-in-out infinite;
 }

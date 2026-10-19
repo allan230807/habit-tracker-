@@ -25,7 +25,7 @@ function load(): GameState {
   if (cache) return cache;
   let saved: unknown = null;
   try {
-    const raw = localStorage.getItem(logic.STORAGE_KEY);
+    const raw = localStorage.getItem(logic.STORAGE_KEY) ?? localStorage.getItem(logic.LEGACY_STORAGE_KEY);
     saved = raw ? JSON.parse(raw) : null;
   } catch {
     saved = null;
@@ -67,10 +67,9 @@ const actions = {
   addGoal: (name: string, targetHours: number) => update((s) => logic.addGoal(s, name, targetHours)),
   removeGoal: (id: string) => update((s) => logic.removeGoal(s, id)),
   setSprite: (st: SpriteState) => update((s) => logic.setSprite(s, st)),
-  startTimer: (goalId: string, minutes: number) =>
-    update((s) => logic.startTimer(s, goalId, minutes, Date.now())),
-  completeTimer: () => update(logic.completeTimer),
-  cancelTimer: () => update(logic.cancelTimer),
+  startStopwatch: (goalId: string) => update((s) => logic.startStopwatch(s, goalId, Date.now())),
+  stopStopwatch: () => update((s) => logic.stopStopwatch(s, Date.now())),
+  cancelStopwatch: () => update(logic.cancelStopwatch),
   addTomorrowTask: (text: string) => update((s) => logic.addTomorrowTask(s, text, today())),
   completeTask: (id: string) => update((s) => logic.completeTask(s, id, today())),
   removeTask: (id: string) => update((s) => logic.removeTask(s, id)),
