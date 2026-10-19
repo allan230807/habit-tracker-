@@ -1,0 +1,121 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-void: #050505;
+  --color-ink: #0c0c10;
+  --color-panel: #121217;
+  --color-line: #2b2b35;
+  --color-neon-cyan: #00f0ff;
+  --color-neon-magenta: #ff2bd6;
+  --color-neon-lime: #9dff00;
+  --font-mono: var(--font-vt), ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans: var(--font-mono);
+}
+
+html {
+  background: #050505;
+  color-scheme: dark;
+}
+
+body {
+  background: #050505;
+  color: #d4d4d8;
+  font-family: var(--font-mono);
+  font-size: 20px;
+  line-height: 1.15;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+/* scanlines CRT */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px);
+}
+
+* {
+  border-radius: 0 !important;
+}
+
+@layer components {
+  .panel {
+    @apply border-4 border-neon-cyan bg-panel p-3 shadow-[4px_4px_0_#000];
+  }
+  .panel-title {
+    @apply mb-3 text-2xl uppercase tracking-widest text-neon-cyan;
+  }
+  .panel-title::before {
+    content: "> ";
+    color: #ff2bd6;
+  }
+  .btn {
+    @apply border-2 border-neon-cyan bg-black px-3 py-1.5 uppercase tracking-wide text-neon-cyan
+      transition-none select-none hover:bg-neon-cyan hover:text-black
+      active:translate-x-[2px] active:translate-y-[2px] disabled:cursor-not-allowed disabled:opacity-35
+      disabled:hover:bg-black disabled:hover:text-neon-cyan;
+  }
+  .btn-lime {
+    @apply border-neon-lime text-neon-lime hover:bg-neon-lime disabled:hover:text-neon-lime;
+  }
+  .btn-magenta {
+    @apply border-neon-magenta text-neon-magenta hover:bg-neon-magenta disabled:hover:text-neon-magenta;
+  }
+  .input {
+    @apply w-full border-2 border-line bg-black px-2 py-1.5 text-neon-lime placeholder:text-zinc-600
+      focus:border-neon-lime focus:outline-none;
+    font-size: 20px; /* evita el zoom automático de iOS */
+  }
+}
+
+.glitch {
+  text-shadow: 2px 0 #ff2bd6, -2px 0 #00f0ff;
+}
+
+@keyframes rgb {
+  to {
+    filter: hue-rotate(360deg);
+  }
+}
+.animate-rgb {
+  animation: rgb 3s linear infinite;
+}
+
+@keyframes bob {
+  50% {
+    transform: translateY(calc(var(--px, 3px) * -1));
+  }
+}
+.animate-bob {
+  animation: bob 1s steps(1) infinite;
+}
+
+@keyframes floaty {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-16px);
+    opacity: 0;
+  }
+}
+.animate-floaty {
+  animation: floaty 2.4s steps(6) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+.animate-blink {
+  animation: blink 1s steps(1) infinite;
+}
