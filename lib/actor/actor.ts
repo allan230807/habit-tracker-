@@ -346,12 +346,14 @@ export class Actor {
   private takeBook(): Step[] {
     const colors = ["#5f7387", "#a3685e", "#6f8f7d", "#8a6f9a", "#c9a66b", "#5d6f8f"];
     return [
-      this.walkTo(SPOTS.bookcase),
+      this.walkTo(SPOTS.stack),
       this.face(-1),
-      { k: "frames", frames: [F(POSES.browse, 520)] },
-      { k: "hold", ms: 900, pose: (t) => ({ ...POSES.browse, head: POSES.browse.head + 6 * Math.sin(t / 220) }) },
-      { k: "frames", frames: [F(POSES.reach, 650)] },
-      { k: "hold", ms: 550, pose: breathe(POSES.reach, 0.5) },
+      { k: "frames", frames: [F(POSES.pickUp, 720)] },
+      {
+        k: "hold",
+        ms: 800,
+        pose: (t) => ({ ...POSES.pickUp, armF: [POSES.pickUp.armF[0] + 3 * Math.sin(t / 180), POSES.pickUp.armF[1]], head: POSES.pickUp.head + 4 * Math.sin(t / 260) }),
+      },
       {
         k: "do",
         fn: (a) => {
@@ -360,18 +362,18 @@ export class Actor {
           a.prop = "book_closed";
         },
       },
-      { k: "frames", frames: [F(POSES.carry, 600)] },
+      { k: "frames", frames: [F(POSES.carry, 720)] },
     ];
   }
 
   private returnBook(): Step[] {
     return [
-      this.walkTo(SPOTS.bookcase),
+      this.walkTo(SPOTS.stack),
       this.face(-1),
-      { k: "frames", frames: [F(POSES.reach, 650)] },
-      { k: "hold", ms: 450, pose: breathe(POSES.reach, 0.5) },
+      { k: "frames", frames: [F(POSES.pickUp, 720)] },
+      { k: "hold", ms: 450, pose: breathe(POSES.pickUp, 0.6) },
       this.set({ prop: "none", book: false }),
-      { k: "frames", frames: [F(POSES.stand, 650)] },
+      { k: "frames", frames: [F(POSES.stand, 720)] },
       this.idleFor(700),
     ];
   }

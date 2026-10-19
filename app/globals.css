@@ -135,3 +135,75 @@ body {
 .animate-pulse-dot {
   animation: pulse-dot 1.4s ease-in-out infinite;
 }
+
+/* nubes, pájaros y motas de polvo de la ventana */
+@keyframes cloud-drift {
+  from {
+    transform: translateX(calc(var(--u) * -16));
+  }
+  to {
+    transform: translateX(calc(var(--u) * 36));
+  }
+}
+.animate-cloud-a {
+  animation: cloud-drift 140s linear infinite;
+  animation-delay: -60s;
+}
+.animate-cloud-b {
+  animation: cloud-drift 95s linear infinite;
+  animation-delay: -20s;
+}
+
+@keyframes bird-fly {
+  0% {
+    transform: translate(calc(var(--u) * -8), 0);
+    opacity: 1;
+  }
+  22% {
+    transform: translate(calc(var(--u) * 40), calc(var(--u) * -4));
+    opacity: 1;
+  }
+  23%,
+  100% {
+    transform: translate(calc(var(--u) * 40), 0);
+    opacity: 0;
+  }
+}
+.animate-bird {
+  animation: bird-fly 60s linear infinite;
+  animation-delay: 4s;
+  opacity: 0;
+}
+
+@keyframes mote {
+  0%,
+  100% {
+    transform: translate(0, 0);
+    opacity: 0.15;
+  }
+  50% {
+    transform: translate(calc(var(--u, 3px) * 2), calc(var(--u, 3px) * -3));
+    opacity: 0.65;
+  }
+}
+.animate-mote {
+  animation: mote 9s ease-in-out infinite;
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0) translateY(-8px);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.animate-pop {
+  animation: pop 0.6s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}

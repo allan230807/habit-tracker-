@@ -70,6 +70,7 @@ const actions = {
   startStopwatch: (goalId: string) => update((s) => logic.startStopwatch(s, goalId, Date.now())),
   stopStopwatch: () => update((s) => logic.stopStopwatch(s, Date.now())),
   cancelStopwatch: () => update(logic.cancelStopwatch),
+  resetStartDate: () => update((s) => logic.resetStartDate(s, today())),
   addTomorrowTask: (text: string) => update((s) => logic.addTomorrowTask(s, text, today())),
   completeTask: (id: string) => update((s) => logic.completeTask(s, id, today())),
   removeTask: (id: string) => update((s) => logic.removeTask(s, id)),

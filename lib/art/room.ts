@@ -1,6 +1,6 @@
 import { Sprite, mix } from "../pixel";
 import { C } from "./palette";
-import { BED, BOOKCASE, CHAIR as CHAIR_BOX, CUSHION, DESK as DESK_BOX, SEAT_H, RUG as RUG_BOX, SCENE, FLOOR_H } from "./layout";
+import { BED, BOOKS, CHAIR as CHAIR_BOX, CUSHION, DESK as DESK_BOX, SEAT_H, RUG as RUG_BOX, SCENE, FLOOR_H } from "./layout";
 
 export { SCENE, FLOOR_H };
 
@@ -52,41 +52,84 @@ export function baseboard() {
 
 export const WIN_GLASS = { x: 3, y: 3, w: 34, h: 40 };
 
-/** La calle que se ve por la ventana. */
-export function streetGlass(day: boolean) {
+export type SkyPhase = "dawn" | "day" | "dusk" | "night";
+
+const SKY: Record<SkyPhase, { top: string; bottom: string }> = {
+  dawn: { top: "#7f9fd1", bottom: "#f6cfa8" },
+  day: { top: "#7fb7e0", bottom: "#d8ecf2" },
+  dusk: { top: "#5b6bb0", bottom: "#f3b27a" },
+  night: { top: "#0a1030", bottom: "#2a3358" },
+};
+
+const ROAD_Y = 33;
+
+/** Cielo: degradado, sol o luna y estrellas (los edificios van en otra capa). */
+export function streetSky(phase: SkyPhase) {
   const { w, h } = WIN_GLASS;
   const s = new Sprite(w, h);
-  const roadY = 33;
-  const skyH = 30;
-  if (day) {
-    s.vgradient(0, 0, w, skyH, "#7fb7e0", "#d8ecf2");
-    s.ellipse(27, 6, 5, 5, "#fff3c4");
-    s.ellipse(27, 6, 3, 3, "#fffbe3");
-    for (const [cx, cy, rx] of [[7, 6, 5], [11, 5, 3.5], [21, 14, 4.5], [5, 17, 3.6]] as const) {
-      s.ellipse(cx, cy, rx, 1.6, "#f8fcfc");
-      s.ellipse(cx + 1, cy - 1, rx * 0.6, 1.4, "#ffffff");
-    }
+  s.vgradient(0, 0, w, ROAD_Y, SKY[phase].top, SKY[phase].bottom);
+  s.rect(0, ROAD_Y, w, h - ROAD_Y, SKY[phase].bottom);
+  if (phase === "day") {
+    s.ellipse(27, 6, 6, 6, "#fff0b8");
+    s.ellipse(27, 6, 4.4, 4.4, "#fff6cf");
+    s.ellipse(27, 6, 3, 3, "#fffbe8");
+  } else if (phase === "dawn") {
+    s.ellipse(9, 26, 7, 7, "#ffd9b0");
+    s.ellipse(9, 26, 4.6, 4.6, "#ffe9c8");
+  } else if (phase === "dusk") {
+    s.ellipse(26, 25, 7.5, 7.5, "#f6a468");
+    s.ellipse(26, 25, 5, 5, "#ffc080");
+    for (let i = 0; i < 6; i++) s.set(Math.floor(rnd(i) * w), Math.floor(rnd(i + 90) * 6), "#c9cdf0");
   } else {
-    s.vgradient(0, 0, w, skyH, "#0a1030", "#2a3358");
-    for (let i = 0; i < 34; i++) s.set(Math.floor(rnd(i) * w), Math.floor(rnd(i + 70) * 18), i % 4 === 0 ? "#f4efd2" : i % 3 === 0 ? "#b9c0e0" : "#7d86ad");
-    s.ellipse(26, 7, 4.6, 4.6, "#f3eed2");
-    s.ellipse(27.4, 6.2, 4.2, 4.2, "#101a40");
-    s.ellipse(26.2, 7, 5.5, 5.5, "#2b3560");
+    for (let i = 0; i < 34; i++) s.set(Math.floor(rnd(i) * w), Math.floor(rnd(i + 70) * 20), i % 4 === 0 ? "#f4efd2" : i % 3 === 0 ? "#b9c0e0" : "#7d86ad");
+    s.ellipse(26, 7, 5.5, 5.5, "#2b3560");
     s.ellipse(26, 7, 4.6, 4.6, "#f3eed2");
     s.ellipse(27.6, 6.1, 4, 4, "#16204a");
   }
-  // edificios lejanos (siluetas tenues)
-  const far = day ? ["#b6c7d6", "#a9bccd", "#bccddb"] : ["#1b2238", "#171d31", "#1e2540"];
+  return s;
+}
+
+/** Nube suelta para animar (variante a/b). */
+export function cloud(variant: 0 | 1, phase: SkyPhase) {
+  const tint = phase === "dawn" ? "#fde3d4" : phase === "dusk" ? "#f6c9b0" : "#f8fcfc";
+  const hi = phase === "dawn" ? "#fff2ea" : phase === "dusk" ? "#ffe0cc" : "#ffffff";
+  const s = new Sprite(variant === 0 ? 14 : 10, variant === 0 ? 5 : 4);
+  if (variant === 0) {
+    s.ellipse(7, 3.4, 6.4, 1.6, tint);
+    s.ellipse(5, 2.4, 3, 1.8, tint);
+    s.ellipse(9, 2.2, 2.6, 1.6, hi);
+  } else {
+    s.ellipse(5, 2.6, 4.6, 1.3, tint);
+    s.ellipse(4, 1.8, 2.2, 1.4, hi);
+  }
+  return s;
+}
+
+export function bird() {
+  const s = new Sprite(6, 3);
+  for (const [x, y] of [[0, 0], [1, 1], [2, 2], [3, 1], [4, 0], [5, 0]] as const) s.set(x, y, "#3a3d45");
+  return s;
+}
+
+/** Ciudad y calle (el cielo queda transparente). */
+export function streetCity(phase: SkyPhase) {
+  const { w, h } = WIN_GLASS;
+  const s = new Sprite(w, h);
+  const night = phase === "night";
+  const warm = phase === "dusk" ? ["#ff9a5c", 0.26] : phase === "dawn" ? ["#ffd2b8", 0.2] : null;
+  const tint = (c: string) => (warm ? mix(c, warm[0] as string, warm[1] as number) : c);
+  const roadY = ROAD_Y;
+  const far = night ? ["#1b2238", "#171d31", "#1e2540"] : ["#b6c7d6", "#a9bccd", "#bccddb"].map(tint);
   for (let x = 0, i = 0; x < w; i++) {
     const bw = 5 + Math.floor(rnd(i * 5) * 5);
     const bh = 9 + Math.floor(rnd(i * 3 + 1) * 10);
     s.rect(x, 26 - bh + 6, bw, bh, far[i % 3]);
     x += bw;
   }
-  // edificios cercanos con ventanas y detalles
-  const near = day
-    ? [["#b8685a", "#d58a76", "#8c4a40"], ["#dccaa8", "#efe2c4", "#b9a883"], ["#8d9bab", "#a9b6c4", "#6b7886"], ["#c7a37e", "#dcc09c", "#9c7e5c"]]
-    : [["#2b2f4a", "#363b5c", "#1d2036"], ["#2f3552", "#3a4163", "#212640"], ["#262b45", "#30365a", "#1a1e34"], ["#2d3350", "#383f62", "#20253c"]];
+  const near = night
+    ? [["#2b2f4a", "#363b5c", "#1d2036"], ["#2f3552", "#3a4163", "#212640"], ["#262b45", "#30365a", "#1a1e34"], ["#2d3350", "#383f62", "#20253c"]]
+    : [["#b8685a", "#d58a76", "#8c4a40"], ["#dccaa8", "#efe2c4", "#b9a883"], ["#8d9bab", "#a9b6c4", "#6b7886"], ["#c7a37e", "#dcc09c", "#9c7e5c"]].map((row) => row.map(tint));
+  const litProb = night ? 0.55 : phase === "dusk" ? 0.5 : phase === "dawn" ? 0.25 : 0;
   let bx = 0;
   let bi = 0;
   while (bx < w) {
@@ -96,68 +139,68 @@ export function streetGlass(day: boolean) {
     s.rect(bx, top, bw, roadY - top - 2, base);
     s.rect(bx, top, bw, 1, hi);
     s.rect(bx + bw - 1, top, 1, roadY - top - 2, lo);
-    s.rect(bx, top - 1, bw, 1, lo); // cornisa
-    if (bi % 2 === 0) s.rect(bx + 2, top - 3, 1, 2, lo); // antena / chimenea
+    s.rect(bx, top - 1, bw, 1, lo);
+    if (bi % 2 === 0) s.rect(bx + 2, top - 3, 1, 2, lo);
     for (let wy = top + 3; wy < roadY - 6; wy += 4)
       for (let wx = bx + 2; wx < bx + bw - 2; wx += 3) {
-        const lit = rnd(wx * 13 + wy * 7) > 0.42;
-        if (day) s.rect(wx, wy, 2, 2, lit ? "#e1eff5" : "#9fb7c6");
-        else s.rect(wx, wy, 2, 2, lit ? "#f3d98a" : "#1a1e34");
-        if (day) s.set(wx, wy, "#ffffff");
+        const lit = rnd(wx * 13 + wy * 7 + 5) < litProb;
+        const glass = night ? "#1a1e34" : tint("#9fb7c6");
+        s.rect(wx, wy, 2, 2, lit ? "#f3d98a" : night ? glass : tint("#dcebf1"));
+        if (!night && !lit) s.set(wx, wy, tint("#ffffff"));
       }
-    // local de planta baja
-    s.rect(bx + 1, roadY - 6, bw - 2, 4, day ? "#6e7a86" : "#232844");
-    s.rect(bx + 2, roadY - 5, bw - 4, 2, day ? "#d8e6ee" : "#f0cf80");
+    s.rect(bx + 1, roadY - 6, bw - 2, 4, night ? "#232844" : tint("#6e7a86"));
+    s.rect(bx + 2, roadY - 5, bw - 4, 2, night || phase === "dusk" ? "#f0cf80" : tint("#d8e6ee"));
     bx += bw;
     bi++;
   }
   // vereda, calle y rayas
-  s.rect(0, roadY - 2, w, 3, day ? "#c2beb3" : "#34374a");
-  s.rect(0, roadY - 2, w, 1, day ? "#d8d4c9" : "#44485c");
-  s.rect(0, roadY + 1, w, h - roadY - 1, day ? "#585c66" : "#181b26");
-  s.rect(0, roadY + 1, w, 1, day ? "#8b8e94" : "#2a2d3c");
-  for (let x = 2; x < w; x += 8) s.rect(x, roadY + 4, 4, 1, day ? "#e6e2d4" : "#555a6d");
-  // árboles en la vereda
+  s.rect(0, roadY - 2, w, 3, night ? "#34374a" : tint("#c2beb3"));
+  s.rect(0, roadY - 2, w, 1, night ? "#44485c" : tint("#d8d4c9"));
+  s.rect(0, roadY + 1, w, h - roadY - 1, night ? "#181b26" : tint("#585c66"));
+  s.rect(0, roadY + 1, w, 1, night ? "#2a2d3c" : tint("#8b8e94"));
+  for (let x = 2; x < w; x += 8) s.rect(x, roadY + 4, 4, 1, night ? "#555a6d" : tint("#e6e2d4"));
+  // árboles
   for (const tx of [6, 24]) {
-    s.rect(tx, roadY - 9, 2, 8, day ? "#6b4a35" : "#2a2420");
-    s.ellipse(tx + 1, roadY - 12, 4.2, 4.4, day ? "#5f9a63" : "#1f3a2b");
-    s.ellipse(tx - 0.5, roadY - 13, 2.2, 2.2, day ? "#86bb82" : "#2c4d39");
-    s.ellipse(tx + 3, roadY - 11, 2, 2, day ? "#4d8452" : "#193126");
+    s.rect(tx, roadY - 9, 2, 8, night ? "#2a2420" : "#6b4a35");
+    s.ellipse(tx + 1, roadY - 12, 4.2, 4.4, night ? "#1f3a2b" : tint("#5f9a63"));
+    s.ellipse(tx - 0.5, roadY - 13, 2.2, 2.2, night ? "#2c4d39" : tint("#86bb82"));
+    s.ellipse(tx + 3, roadY - 11, 2, 2, night ? "#193126" : tint("#4d8452"));
   }
-  // farola
+  // farola (encendida al atardecer y de noche)
   const lx = 15;
-  s.rect(lx, roadY - 15, 1, 14, day ? "#3a3d45" : "#555a6a");
-  s.rect(lx, roadY - 16, 4, 1, day ? "#3a3d45" : "#555a6a");
-  s.rect(lx + 3, roadY - 15, 2, 1, day ? "#c9c5b6" : "#fff0b8");
-  if (!day) {
-    s.tint(lx + 4, roadY - 14, 12, "#f3d98a", 0.75);
-  }
+  const lampOn = phase === "night" || phase === "dusk";
+  s.rect(lx, roadY - 15, 1, 14, night ? "#555a6a" : "#3a3d45");
+  s.rect(lx, roadY - 16, 4, 1, night ? "#555a6a" : "#3a3d45");
+  s.rect(lx + 3, roadY - 15, 2, 1, lampOn ? "#fff0b8" : "#c9c5b6");
+  if (lampOn) s.tint(lx + 4, roadY - 14, 12, "#f3d98a", night ? 0.75 : 0.45);
   // auto estacionado
   const cx = 2;
   const cy = roadY + 1;
-  s.rect(cx, cy, 12, 3, day ? "#b9433c" : "#5a2a2c");
-  s.rect(cx + 2, cy - 2, 7, 2, day ? "#b9433c" : "#5a2a2c");
-  s.rect(cx + 3, cy - 1, 2, 1, day ? "#a9d0e6" : "#1b2a46");
-  s.rect(cx + 6, cy - 1, 2, 1, day ? "#a9d0e6" : "#1b2a46");
+  s.rect(cx, cy, 12, 3, night ? "#5a2a2c" : "#b9433c");
+  s.rect(cx + 2, cy - 2, 7, 2, night ? "#5a2a2c" : "#b9433c");
+  s.rect(cx + 3, cy - 1, 2, 1, night ? "#1b2a46" : "#a9d0e6");
+  s.rect(cx + 6, cy - 1, 2, 1, night ? "#1b2a46" : "#a9d0e6");
   s.rect(cx + 2, cy + 3, 2, 1, "#15161a");
   s.rect(cx + 8, cy + 3, 2, 1, "#15161a");
   return s;
 }
 
 /** Auto que cruza la calle (se anima con CSS). */
-export function car(day: boolean) {
+export function car(phase: SkyPhase) {
+  const night = phase === "night";
   const s = new Sprite(14, 7);
-  const body = day ? "#d9dce2" : "#4b505f";
-  const dark = day ? "#a9aeb8" : "#2f3340";
+  const body = night ? "#4b505f" : "#d9dce2";
+  const dark = night ? "#2f3340" : "#a9aeb8";
   s.rect(0, 3, 14, 3, body);
   s.rect(2, 1, 9, 2, body);
   s.rect(0, 5, 14, 1, dark);
-  s.rect(3, 1, 3, 2, day ? "#8fc0dc" : "#1b2a46");
-  s.rect(7, 1, 3, 2, day ? "#8fc0dc" : "#1b2a46");
+  s.rect(3, 1, 3, 2, night ? "#1b2a46" : "#8fc0dc");
+  s.rect(7, 1, 3, 2, night ? "#1b2a46" : "#8fc0dc");
   s.rect(1, 5, 3, 2, "#15161a");
   s.rect(10, 5, 3, 2, "#15161a");
-  s.set(13, 3, day ? "#f3e2a8" : "#fff3c4");
-  s.set(13, 4, day ? "#f3e2a8" : "#fff3c4");
+  const lamp = night || phase === "dusk" ? "#fff3c4" : "#f3e2a8";
+  s.set(13, 3, lamp);
+  s.set(13, 4, lamp);
   s.set(0, 3, "#c4554f");
   return s.outline(C.line);
 }
@@ -301,57 +344,72 @@ export function bedBlanket(mode: BlanketMode) {
   return s.outline(C.line);
 }
 
-// ------------------------------------------------------------------ librero
+// ------------------------------------------------------------------ libros
 
-export function bookcase(gap: boolean) {
-  const s = new Sprite(BOOKCASE.w, BOOKCASE.h);
-  s.rect(0, 0, BOOKCASE.w, BOOKCASE.h, WOOD.lo);
-  s.rect(1, 1, BOOKCASE.w - 2, BOOKCASE.h - 2, "#7a5738");
-  s.rect(0, 0, BOOKCASE.w, 1, WOOD.hi);
-  s.rect(0, 0, 1, BOOKCASE.h, WOOD.base);
-  s.rect(BOOKCASE.w - 1, 0, 1, BOOKCASE.h, WOOD.dark);
-  const shelfYs = [0, 12, 24, 36, 48];
-  const palette = ["#7d8fa3", "#c9a66b", "#6f8f7d", "#a3685e", "#5d6f8f", "#d6c9a8", "#8a6f9a", "#9fb27a", "#c98f6a"];
-  let seed = 3;
-  shelfYs.forEach((sy, si) => {
-    const baseY = sy + 12;
-    s.rect(1, baseY - 1, BOOKCASE.w - 2, 2, WOOD.base);
-    s.rect(1, baseY - 1, BOOKCASE.w - 2, 1, WOOD.hi);
-    s.rect(1, sy + 1, BOOKCASE.w - 2, 1, "#5e4229"); // sombra bajo la tabla superior
-    let x = 2;
-    while (x < BOOKCASE.w - 3) {
-      const bw = 2 + Math.floor(rnd(seed++) * 2);
-      const bh = 6 + Math.floor(rnd(seed++) * 4);
-      const col = palette[Math.floor(rnd(seed++) * palette.length)];
-      if (gap && si === 2 && x >= 9 && x < 12) {
-        x += bw;
-        continue;
-      }
-      if (si === 4 && x > 9) break; // el estante de arriba tiene espacio libre
-      s.rect(x, baseY - 1 - bh, bw, bh, col);
-      s.rect(x, baseY - 1 - bh, 1, bh, mix(col, "#ffffff", 0.28));
-      s.rect(x + bw - 1, baseY - 1 - bh, 1, bh, mix(col, "#000000", 0.25));
-      s.set(x, baseY - 1 - bh + 2, mix(col, "#ffffff", 0.55));
-      x += bw;
-    }
+/** Pila de libros en el piso (3 libros; 2 cuando se llevó uno). */
+export function bookStack(n: number) {
+  const s = new Sprite(BOOKS.w, BOOKS.h);
+  const books: [number, number, string][] = [
+    [10, 3, "#5d6f8f"],
+    [9, 3, "#c98f6a"],
+    [8, 3, "#6f8f7d"],
+  ];
+  let y = BOOKS.h;
+  books.slice(0, n).forEach(([w, h, c], i) => {
+    y -= h;
+    const x = i % 2 === 0 ? 0 : 1;
+    s.rect(x, y, w, h, c);
+    s.rect(x, y, w, 1, mix(c, "#ffffff", 0.3));
+    s.rect(x + w - 1, y, 1, h, mix(c, "#000000", 0.22));
+    s.rect(x + 1, y + h - 1, w - 2, 1, "#f1efe9"); // cantos de las hojas
   });
-  // planta y marco encima
-  s.rect(3, BOOKCASE.h - 1, 0, 0, null);
   return s.outline(C.line);
 }
 
-export function topPlant() {
-  const s = new Sprite(14, 14);
-  s.rect(4, 9, 7, 5, "#cfcbc0");
-  s.rect(4, 9, 7, 1, "#e9e6dd");
-  s.rect(4, 13, 7, 1, "#9c988d");
-  s.ellipse(7.5, 5, 3, 4.6, "#4f8a6f");
-  s.ellipse(4, 6.5, 2.4, 3.2, "#5f9d7e");
-  s.ellipse(11, 6.5, 2.4, 3.2, "#5f9d7e");
-  s.set(7, 2, "#8cc9a8");
-  s.set(4, 4, "#8cc9a8");
-  s.set(11, 4, "#8cc9a8");
-  s.rect(7, 8, 1, 3, "#2f5a47");
+/** Cuadrito de una meta cumplida: el dibujo depende de la categoría. */
+export function goalFrame(stat: string) {
+  const s = new Sprite(11, 13);
+  s.rect(0, 0, 11, 13, "#35312d");
+  s.rect(1, 1, 9, 11, "#f7f5ef");
+  const bg: Record<string, string> = {
+    inteligencia: "#dbe8f3",
+    dinero: "#efe6c9",
+    fuerza: "#f3dcd8",
+    espiritu: "#dcd8ee",
+    disciplina: "#d8e8df",
+  };
+  s.rect(2, 2, 7, 9, bg[stat] ?? "#e8e6df");
+  switch (stat) {
+    case "inteligencia": // foco
+      s.ellipse(5.5, 5.5, 2.4, 2.6, "#f3d46a");
+      s.set(4, 4, "#fff3b5");
+      s.rect(4, 8, 3, 1, "#8b909a");
+      s.rect(4, 9, 3, 1, "#6c7280");
+      break;
+    case "dinero": // moneda
+      s.ellipse(5.5, 6.5, 2.8, 2.8, "#d9b24a");
+      s.ellipse(5.5, 6.5, 1.6, 1.6, "#f1d98a");
+      s.rect(5, 5, 1, 3, "#a3801f");
+      break;
+    case "fuerza": // corazón
+      for (const [x, y] of [[3, 4], [4, 4], [6, 4], [7, 4], [3, 5], [4, 5], [5, 5], [6, 5], [7, 5], [4, 6], [5, 6], [6, 6], [5, 7]] as const) s.set(x, y, "#cf6f6a");
+      s.set(3, 4, "#e58f8a");
+      break;
+    case "espiritu": // luna y estrella
+      s.ellipse(5, 6, 2.6, 2.6, "#f3eed2");
+      s.ellipse(6.2, 5.4, 2.4, 2.4, "#dcd8ee");
+      s.set(7, 3, "#f3d98a");
+      s.set(3, 9, "#f3d98a");
+      break;
+    default: // montaña con bandera
+      s.limb(2, 10, 5, 5, 1, "#6b7a8c");
+      s.limb(5, 5, 8, 10, 1, "#6b7a8c");
+      s.rect(3, 9, 5, 2, "#8da0b4");
+      s.rect(5, 3, 1, 3, "#3a3d45");
+      s.rect(6, 3, 2, 1, "#cf7f78");
+      break;
+  }
+  s.set(5, 0, "#1d1b19");
   return s.outline(C.line);
 }
 
@@ -482,25 +540,6 @@ export function board(levels: (number | null)[][]) {
   );
   s.set(2, 1, "#c4554f");
   s.set(29, 1, "#c4554f");
-  return s.outline(C.line);
-}
-
-export function frame(variant: number) {
-  const s = new Sprite(14, 18);
-  s.rect(0, 0, 14, 18, "#2d2a27");
-  s.rect(1, 1, 12, 16, "#f6f4ee");
-  if (variant === 0) {
-    s.vgradient(2, 2, 10, 14, "#9cc3d9", "#e8d9b4");
-    s.rect(2, 11, 10, 5, "#6f8f7d");
-    s.ellipse(8, 7, 2.2, 2.2, "#f3d98a");
-    s.rect(2, 13, 10, 3, "#587a69");
-  } else {
-    s.rect(2, 2, 10, 14, "#e8e2d4");
-    s.ellipse(7, 9, 3.4, 3.4, "#cf7f78");
-    s.ellipse(7, 9, 1.6, 1.6, "#f1ece0");
-    s.rect(3, 13, 8, 1, "#8b909a");
-  }
-  s.rect(0, 0, 14, 1, "#4a4540");
   return s.outline(C.line);
 }
 

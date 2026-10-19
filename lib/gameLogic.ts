@@ -68,8 +68,13 @@ export const monthLabel = (key: string) => MONTHS[Number(key.split("-")[1]) - 1]
 /** Día 1 = appStartDate. */
 export const dayNumber = (s: GameState, today: string) => Math.max(1, daysBetween(s.appStartDate, today) + 1);
 
-/** Sol 7:00–19:59, noche 20:00–6:59. */
-export const isDaytime = (d: Date) => d.getHours() >= 7 && d.getHours() < 20;
+export type Phase = "dawn" | "day" | "dusk" | "night";
+
+/** Amanecer 6–8, día 8–17, atardecer 17–20, noche 20–6. */
+export const phaseOf = (hour: number): Phase =>
+  hour >= 6 && hour < 8 ? "dawn" : hour >= 8 && hour < 17 ? "day" : hour >= 17 && hour < 20 ? "dusk" : "night";
+
+export const isDaytime = (d: Date) => phaseOf(d.getHours()) !== "night";
 
 /** El personaje duerme de 23:00 a 6:59. */
 export const isSleepTime = (hour: number) => hour >= 23 || hour < 7;
@@ -90,6 +95,7 @@ export function createInitialState(now: Date): GameState {
   return recompute({
     version: 1,
     appStartDate: dateKey(now),
+    startAdjusted: true,
     coins: 0,
     characterStats: { level: 1, discipline: 0, focus: 0 },
     habits: [
@@ -116,6 +122,13 @@ export function hydrate(raw: unknown, now: Date): GameState {
   delete saved.currentState; // el personaje ahora actúa solo
   const s = { ...base, ...(saved as Partial<GameState>) };
   s.goals = s.goals.map((g) => ({ ...g, stat: STAT_KEYS.includes(g.stat) ? g.stat : "disciplina" }));
+  // Ajuste único: si se abrió por primera vez ayer, el Día 1 pasa a ser hoy.
+  if (!saved.startAdjusted) {
+    const today = dateKey(now);
+    const age = /^\d{4}-\d{2}-\d{2}$/.test(s.appStartDate) ? daysBetween(s.appStartDate, today) : 0;
+    if (age === 1) s.appStartDate = today;
+    s.startAdjusted = true;
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s.appStartDate)) s.appStartDate = base.appStartDate;
   return recompute(s);
 }
@@ -239,6 +252,9 @@ export function addHabit(s: GameState, name: string, stat: StatKey) {
 export const removeHabit = (s: GameState, id: string) =>
   recompute({ ...s, habits: s.habits.filter((h) => h.id !== id) });
 
+/** Reinicia la cuenta: el Día 1 pasa a ser hoy. */
+export const resetStartDate = (s: GameState, today: string): GameState => ({ ...s, appStartDate: today });
+
 export function addGoal(s: GameState, name: string, targetHours: number, stat: StatKey) {
   if (!name.trim() || !(targetHours > 0) || !STAT_KEYS.includes(stat)) return s;
   return { ...s, goals: [...s.goals, { id: uid(), name: name.trim(), stat, targetHours, currentHours: 0 }] };
@@ -259,9 +275,11 @@ export function stopStopwatch(s: GameState, nowMs: number): GameState {
   const w = s.stopwatch;
   if (!w) return s;
   const hours = Math.max(0, nowMs - w.startedAt) / 3_600_000;
-  const goals = s.goals.map((g) =>
-    g.id === w.goalId ? { ...g, currentHours: Math.round((g.currentHours + hours) * 10000) / 10000 } : g,
-  );
+  const goals = s.goals.map((g) => {
+    if (g.id !== w.goalId) return g;
+    const next = { ...g, currentHours: Math.round((g.currentHours + hours) * 10000) / 10000 };
+    return isGoalDone(next) && !next.doneAt ? { ...next, doneAt: nowMs } : next;
+  });
   return recompute({ ...s, goals, stopwatch: null });
 }
 

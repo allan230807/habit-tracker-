@@ -24,6 +24,8 @@ export interface Goal {
   stat: StatKey;
   targetHours: number;
   currentHours: number;
+  /** Momento en que se cumplió (para ordenar los cuadros de la pared). */
+  doneAt?: number;
 }
 
 export interface Transaction {
@@ -66,6 +68,8 @@ export interface CharacterStats {
 export interface GameState {
   version: 1;
   appStartDate: string;
+  /** true cuando ya se ajustó el Día 1 al día real de inicio. */
+  startAdjusted?: boolean;
   coins: number;
   characterStats: CharacterStats;
   habits: Habit[];

@@ -6,7 +6,7 @@ import { useNow } from "@/hooks/useNow";
 import { ROOM_ZOOM, useStageNav, type Section } from "@/hooks/useStageNav";
 import { setActorInputs } from "@/lib/actor/store";
 import type { DeskItem } from "@/lib/art/desk";
-import { computeProgress, dateKey, dayNumber, hasGamerDesk, heatLevels, isDaytime, isSleepTime } from "@/lib/gameLogic";
+import { computeProgress, dateKey, dayNumber, hasGamerDesk, heatLevels, isGoalDone, isSleepTime, phaseOf } from "@/lib/gameLogic";
 import { mix } from "@/lib/pixel";
 import DeskScene from "./scenes/DeskScene";
 import RoomScene from "./scenes/RoomScene";
@@ -76,7 +76,12 @@ export default function GameApp() {
   }
 
   const date = new Date(now);
-  const day = isDaytime(date);
+  const phase = phaseOf(date.getHours());
+  const day = phase !== "night";
+  const doneGoals = state.goals
+    .filter(isGoalDone)
+    .sort((a, b) => (a.doneAt ?? 0) - (b.doneAt ?? 0))
+    .map((g) => g.stat);
   const gamer = hasGamerDesk(state);
   const p = computeProgress(state);
   const sw = state.stopwatch;
@@ -133,7 +138,8 @@ export default function GameApp() {
               {nav.scene === "room" ? (
                 <RoomScene
                   u={u}
-                  day={day}
+                  phase={phase}
+                  frames={doneGoals}
                   hour={date.getHours()}
                   minute={date.getMinutes()}
                   gamer={gamer}

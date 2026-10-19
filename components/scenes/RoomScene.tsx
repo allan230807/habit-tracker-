@@ -5,7 +5,7 @@ import { Pixel } from "@/components/Pixel";
 import {
   BED,
   BOARD,
-  BOOKCASE,
+  BOOKS,
   CHAIR,
   CUSHION,
   DESK,
@@ -22,33 +22,39 @@ import {
   bedBase,
   bedBlanket,
   board,
-  bookcase,
+  bird,
+  bookStack,
   cactus,
   car,
   chair,
   clock,
+  cloud,
   cushion,
   desk,
   deskLamp,
   deskTrinkets,
   floor,
-  frame,
+  goalFrame,
   laptopSide,
   monitor,
   rug,
-  streetGlass,
-  topPlant,
+  streetCity,
+  streetSky,
   windowFrame,
+  type SkyPhase,
 } from "@/lib/art/room";
 import { useActorFrame } from "@/lib/actor/store";
+import type { StatKey } from "@/lib/types";
 
 interface Props {
   u: number;
-  day: boolean;
+  phase: SkyPhase;
   hour: number;
   minute: number;
   gamer: boolean;
   heat: (number | null)[][];
+  /** Categorías de las metas cumplidas (un cuadrito por cada una). */
+  frames: StatKey[];
   /** Mostrar los puntos que indican qué objetos se pueden tocar. */
   hints: boolean;
   onDesk: () => void;
@@ -62,8 +68,8 @@ const RUG = rug();
 const CUSHION_S = cushion();
 const BED_S = bedBase();
 const BLANKETS = { flat: bedBlanket("flat"), legs: bedBlanket("legs"), knees: bedBlanket("knees") };
-const CASE = bookcase(false);
-const CASE_GAP = bookcase(true);
+const BOOKS_3 = bookStack(3);
+const BOOKS_2 = bookStack(2);
 const CHAIR_S = chair();
 const DESK_S = desk(false);
 const DESK_GAMER = desk(true);
@@ -71,14 +77,29 @@ const MONITOR = monitor();
 const LAPTOP = laptopSide();
 const TRINKETS = deskTrinkets();
 const LAMP = deskLamp();
-const PLANT = topPlant();
 const FRAME = windowFrame();
 const CACTUS = cactus();
-const GLASS_DAY = streetGlass(true);
-const GLASS_NIGHT = streetGlass(false);
-const CAR_DAY = car(true);
-const CAR_NIGHT = car(false);
-const FRAMES = [frame(0), frame(1)];
+const SKIES = { dawn: streetSky("dawn"), day: streetSky("day"), dusk: streetSky("dusk"), night: streetSky("night") };
+const CITIES = { dawn: streetCity("dawn"), day: streetCity("day"), dusk: streetCity("dusk"), night: streetCity("night") };
+const CARS = { dawn: car("dawn"), day: car("day"), dusk: car("dusk"), night: car("night") };
+const CLOUDS = {
+  dawn: [cloud(0, "dawn"), cloud(1, "dawn")],
+  day: [cloud(0, "day"), cloud(1, "day")],
+  dusk: [cloud(0, "dusk"), cloud(1, "dusk")],
+  night: [cloud(0, "night"), cloud(1, "night")],
+};
+const BIRD = bird();
+const GOAL_FRAMES: Record<string, ReturnType<typeof goalFrame>> = {};
+const frameSprite = (k: string) => (GOAL_FRAMES[k] ??= goalFrame(k));
+
+/** Lugares de la pared para los cuadritos (esquina inferior izquierda). */
+const FRAME_SLOTS: [number, number][] = [
+  [2, 100], [12, 100],
+  [2, 84], [12, 84],
+  [2, 68], [12, 68],
+  [2, 52], [12, 52],
+  [92, 100], [104, 100], [116, 100],
+];
 
 interface PlaceProps {
   u: number;
@@ -159,28 +180,103 @@ function Character({ u }: { u: number }) {
       <Place u={u} x={BED.x} y={BED.y} z={f.inBed ? 6 : 2}>
         <Pixel sprite={f.sleeping ? BLANKETS.knees : f.bed === "propped" ? BLANKETS.legs : BLANKETS.flat} u={u} style={SHADOW(u, 0.1)} />
       </Place>
-      <Place u={u} x={BOOKCASE.x} y={BOOKCASE.y} z={2}>
-        <Pixel sprite={f.bookGap ? CASE_GAP : CASE} u={u} style={SHADOW(u)} />
+      <Place u={u} x={BOOKS.x} y={BOOKS.y} z={3}>
+        <Pixel sprite={f.bookGap ? BOOKS_2 : BOOKS_3} u={u} />
       </Place>
     </>
   );
 }
 
-export default function RoomScene({ u, day, hour, minute, gamer, heat, hints, onDesk, onBoard }: Props) {
+const BEAM: Record<SkyPhase, { rgb: string; a: number }> = {
+  dawn: { rgb: "255,200,170", a: 0.2 },
+  day: { rgb: "255,248,222", a: 0.2 },
+  dusk: { rgb: "255,165,95", a: 0.22 },
+  night: { rgb: "185,205,255", a: 0.1 },
+};
+
+/** Haz de luz que entra por la ventana; se desplaza con la hora del día. */
+function LightBeam({ u, phase, hour, minute }: { u: number; phase: SkyPhase; hour: number; minute: number }) {
+  const t = hour + minute / 60;
+  // de mañana la luz cae hacia la derecha; de tarde, hacia la izquierda
+  const shift = phase === "night" ? 6 : Math.max(-36, Math.min(36, (12.5 - t) * 6));
+  const gx = WINDOW.x + WIN_GLASS.x;
+  const top = WINDOW.y + WINDOW.h - WIN_GLASS.y - WIN_GLASS.h; // base del vidrio
+  const topY = top + 0;
+  const botY = 8;
+  const x0 = Math.min(gx, gx + shift);
+  const x1 = Math.max(gx + WIN_GLASS.w, gx + WIN_GLASS.w + shift);
+  const w = x1 - x0;
+  const h = topY - botY;
+  const px = (x: number) => (x - x0) * u;
+  const py = (y: number) => (topY - y) * u;
+  const pts = [
+    [gx, topY],
+    [gx + WIN_GLASS.w, topY],
+    [gx + WIN_GLASS.w + shift, botY],
+    [gx + shift, botY],
+  ]
+    .map(([x, y]) => `${px(x)},${py(y)}`)
+    .join(" ");
+  const c = BEAM[phase];
+  const motes = useMemo(
+    () =>
+      Array.from({ length: 9 }, (_, i) => {
+        const r1 = (Math.sin(i * 12.9898) * 43758.5453) % 1;
+        const r2 = (Math.sin(i * 78.233 + 1) * 12345.678) % 1;
+        const a = Math.abs(r1);
+        const b = Math.abs(r2);
+        return { a, b, i };
+      }),
+    [],
+  );
+  return (
+    <div className="pointer-events-none absolute z-[25]" style={{ left: x0 * u, bottom: botY * u, width: w * u, height: h * u }}>
+      <svg width={w * u} height={h * u} className="absolute inset-0">
+        <defs>
+          <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={`rgb(${c.rgb})`} stopOpacity={c.a} />
+            <stop offset="1" stopColor={`rgb(${c.rgb})`} stopOpacity={c.a * 0.25} />
+          </linearGradient>
+        </defs>
+        <polygon points={pts} fill="url(#beam)" />
+      </svg>
+      {phase !== "night" &&
+        motes.map(({ a, b, i }) => {
+          const yy = b * (h - 4);
+          const xx = a * WIN_GLASS.w + (shift * yy) / h;
+          return (
+            <span
+              key={i}
+              className="animate-mote absolute rounded-full bg-white"
+              style={{
+                left: Math.max(0, xx) * u,
+                top: yy * u,
+                width: Math.max(2, u * 0.8),
+                height: Math.max(2, u * 0.8),
+                animationDelay: `${-i * 1.7}s`,
+                animationDuration: `${7 + (i % 4) * 2}s`,
+              }}
+            />
+          );
+        })}
+    </div>
+  );
+}
+
+export default function RoomScene({ u, phase, hour, minute, gamer, heat, frames, hints, onDesk, onBoard }: Props) {
   const boardSprite = useMemo(() => board(heat), [heat]);
   const clockSprite = useMemo(() => clock(hour, minute), [hour, minute]);
-  const wallTop = day ? "#f7f6f3" : "#f1f0ed";
-  const wallBot = day ? "#ebe9e4" : "#e6e4df";
+  const night = phase === "night";
+  const wallTop = night ? "#f1f0ed" : "#f7f6f3";
+  const wallBot = night ? "#e6e4df" : "#ebe9e4";
   const deskTop = DEPTH + DESK_H;
+  const clouds = CLOUDS[phase];
 
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ width: SCENE.w * u, height: SCENE.h * u }}>
       {/* pared blanca con luz suave arriba */}
       <div className="absolute inset-x-0 top-0" style={{ bottom: (FLOOR_H - 2) * u, background: `linear-gradient(${wallTop}, ${wallBot})` }} />
-      <div
-        className="absolute inset-x-0 top-0"
-        style={{ height: 14 * u, background: "linear-gradient(rgba(0,0,0,.07), rgba(0,0,0,0))" }}
-      />
+      <div className="absolute inset-x-0 top-0" style={{ height: 14 * u, background: "linear-gradient(rgba(0,0,0,.07), rgba(0,0,0,0))" }} />
       <Place u={u} x={0} y={0} z={0}>
         <Pixel sprite={FLOOR} u={u} />
       </Place>
@@ -191,22 +287,20 @@ export default function RoomScene({ u, day, hour, minute, gamer, heat, hints, on
         <Pixel sprite={RUG} u={u} />
       </Place>
 
-      {/* decoración de pared */}
+      {/* pared: reloj, tablero y un cuadrito por cada meta cumplida */}
       <Place u={u} x={BOARD.x} y={BOARD.y} z={1}>
         <Pixel sprite={boardSprite} u={u} style={SHADOW(u, 0.22)} />
-      </Place>
-      <Place u={u} x={96} y={92} z={1}>
-        <Pixel sprite={FRAMES[0]} u={u} style={SHADOW(u)} />
-      </Place>
-      <Place u={u} x={114} y={90} z={1}>
-        <Pixel sprite={FRAMES[1]} u={u} style={SHADOW(u)} />
       </Place>
       <Place u={u} x={72} y={96} z={1}>
         <Pixel sprite={clockSprite} u={u} />
       </Place>
-      <Place u={u} x={BOOKCASE.x + 2} y={BOOKCASE.y + BOOKCASE.h} z={2}>
-        <Pixel sprite={PLANT} u={u} />
-      </Place>
+      {frames.slice(0, FRAME_SLOTS.length).map((stat, i) => (
+        <Place key={`${stat}-${i}`} u={u} x={FRAME_SLOTS[i][0]} y={FRAME_SLOTS[i][1]} z={1}>
+          <div className="animate-pop" style={{ transformOrigin: "50% 100%" }}>
+            <Pixel sprite={frameSprite(stat)} u={u} style={SHADOW(u, 0.2)} />
+          </div>
+        </Place>
+      ))}
 
       {/* muebles */}
       <Place u={u} x={BED.x} y={BED.y} z={2}>
@@ -240,15 +334,38 @@ export default function RoomScene({ u, day, hour, minute, gamer, heat, hints, on
 
       <Character u={u} />
 
-      {/* noche: sombra general (la ventana y las luces quedan por encima) */}
-      {!day && <div className="pointer-events-none absolute inset-0 z-[30]" style={{ background: "rgba(14,20,48,.46)" }} />}
+      {/* haz de luz de la ventana */}
+      <LightBeam u={u} phase={phase} hour={hour} minute={minute} />
+
+      {/* ambiente: noche oscura, amanecer y atardecer con luz cálida */}
+      {night && <div className="pointer-events-none absolute inset-0 z-[30]" style={{ background: "rgba(14,20,48,.46)" }} />}
+      {phase === "dawn" && <div className="pointer-events-none absolute inset-0 z-[29]" style={{ background: "rgba(255,190,150,.10)" }} />}
+      {phase === "dusk" && <div className="pointer-events-none absolute inset-0 z-[29]" style={{ background: "rgba(255,140,80,.15)" }} />}
 
       {/* ventana grande con la calle (un solo vidrio) */}
       <Place u={u} x={WINDOW.x + WIN_GLASS.x} y={WINDOW.y + WINDOW.h - WIN_GLASS.y - WIN_GLASS.h} z={31}>
-        <div className="relative overflow-hidden" style={{ width: WIN_GLASS.w * u, height: WIN_GLASS.h * u }}>
-          <Pixel sprite={day ? GLASS_DAY : GLASS_NIGHT} u={u} />
-          <div className="animate-drive absolute" style={{ top: 33 * u, left: 0, "--u": `${u}px` } as CSSProperties}>
-            <Pixel sprite={day ? CAR_DAY : CAR_NIGHT} u={u} />
+        <div className="relative overflow-hidden" style={{ width: WIN_GLASS.w * u, height: WIN_GLASS.h * u, "--u": `${u}px` } as CSSProperties}>
+          <Pixel sprite={SKIES[phase]} u={u} />
+          {!night && (
+            <>
+              <div className="animate-cloud-a absolute" style={{ top: 3 * u, left: 0 }}>
+                <Pixel sprite={clouds[0]} u={u} />
+              </div>
+              <div className="animate-cloud-b absolute" style={{ top: 12 * u, left: 0 }}>
+                <Pixel sprite={clouds[1]} u={u} />
+              </div>
+            </>
+          )}
+          <div className="absolute inset-0">
+            <Pixel sprite={CITIES[phase]} u={u} />
+          </div>
+          {!night && (
+            <div className="animate-bird absolute" style={{ top: 9 * u, left: 0 }}>
+              <Pixel sprite={BIRD} u={u} />
+            </div>
+          )}
+          <div className="animate-drive absolute" style={{ top: 33 * u, left: 0 }}>
+            <Pixel sprite={CARS[phase]} u={u} />
           </div>
         </div>
       </Place>
@@ -260,7 +377,7 @@ export default function RoomScene({ u, day, hour, minute, gamer, heat, hints, on
       </Place>
 
       {/* luces nocturnas */}
-      {!day && (
+      {night && (
         <>
           <div
             className="pointer-events-none absolute z-[34]"
@@ -280,16 +397,6 @@ export default function RoomScene({ u, day, hour, minute, gamer, heat, hints, on
               width: 30 * u,
               height: 22 * u,
               background: "radial-gradient(circle, rgba(170,215,255,.26), rgba(170,215,255,0) 68%)",
-            }}
-          />
-          <div
-            className="pointer-events-none absolute z-[34]"
-            style={{
-              left: 18 * u,
-              bottom: 14 * u,
-              width: 56 * u,
-              height: 52 * u,
-              background: "radial-gradient(ellipse, rgba(190,210,255,.22), rgba(190,210,255,0) 70%)",
             }}
           />
         </>

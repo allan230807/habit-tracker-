@@ -16,7 +16,7 @@ function Bar({ pct, color, label, title }: { pct: number; color: string; label: 
   );
 }
 
-export default function StatsSection({ state, today }: SectionProps) {
+export default function StatsSection({ state, today, actions }: SectionProps) {
   const p = computeProgress(state);
   const day = dayNumber(state, today);
 
@@ -63,6 +63,16 @@ export default function StatsSection({ state, today }: SectionProps) {
           <div className="text-right">
             <p className="section-title !mb-1">Hoy es el</p>
             <p className="font-mono text-3xl font-medium text-accent">Día {day}</p>
+            {day > 1 && (
+              <button
+                className="mt-1 text-xs text-muted underline-offset-2 hover:text-fg hover:underline"
+                onClick={() => {
+                  if (confirm("¿Empezar la cuenta de nuevo? Hoy pasará a ser el Día 1.")) actions.resetStartDate();
+                }}
+              >
+                Empezar el Día 1 hoy
+              </button>
+            )}
           </div>
         </div>
         <ProgressBar value={p.xp - p.levelStartXp} max={p.nextLevelXp - p.levelStartXp} label="Experiencia" right={`${p.xp} / ${p.nextLevelXp} XP`} />

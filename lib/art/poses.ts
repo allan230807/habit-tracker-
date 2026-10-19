@@ -28,6 +28,15 @@ export const POSES = {
   carry: pose({ torso: 3, head: 4, armF: [22, 70], armB: [-6, 2] }),
   /** De pie leyendo el lomo / hojeando. */
   browse: pose({ torso: 5, head: 14, armF: [48, 112], armB: [40, 104] }),
+  /** Agachado para recoger un libro del piso. */
+  pickUp: pose({
+    torso: 40,
+    head: 6,
+    armF: [36, 24],
+    armB: [30, 18],
+    legF: [100, -62, 4],
+    legB: [96, -66, 4],
+  }),
   /** Escribiendo en una pizarra. */
   write: pose({ torso: 6, head: -4, armF: [128, 158], armB: [-6, 4], legF: [6, 4, 6], legB: [-4, -6, -4] }),
   /** Sentado en una silla escribiendo en la laptop. */
