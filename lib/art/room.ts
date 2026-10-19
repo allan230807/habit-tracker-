@@ -1,8 +1,8 @@
 import { Sprite, mix } from "../pixel";
 import { C } from "./palette";
+import { BED, BOOKCASE, CHAIR as CHAIR_BOX, CUSHION, DESK as DESK_BOX, SEAT_H, RUG as RUG_BOX, SCENE, FLOOR_H } from "./layout";
 
-export const SCENE = { w: 112, h: 100 };
-export const FLOOR_H = 16;
+export { SCENE, FLOOR_H };
 
 /** Pseudo-aleatorio determinista para que el arte sea estable entre renders. */
 const rnd = (n: number) => {
@@ -10,280 +10,453 @@ const rnd = (n: number) => {
   return x - Math.floor(x);
 };
 
+const OAK = { base: "#c9a47a", light: "#d8b68c", dark: "#b78f66", grain: "#a98258" };
+const WOOD = { base: "#9a6f4b", hi: "#b88a60", lo: "#6f4d33", dark: "#4f3524" };
+
+// ------------------------------------------------------------------ piso
+
+export function floor() {
+  const s = new Sprite(SCENE.w, FLOOR_H);
+  // tablones horizontales vistos de frente, con juntas desfasadas y veta
+  const rows = 4;
+  const rh = FLOOR_H / rows;
+  for (let r = 0; r < rows; r++) {
+    const y = r * rh;
+    for (let x = 0; x < SCENE.w; ) {
+      const len = 26 + Math.floor(rnd(r * 17 + x) * 26);
+      const shade = rnd(r * 31 + x * 7);
+      const base = shade > 0.66 ? OAK.light : shade > 0.33 ? OAK.base : OAK.dark;
+      s.rect(x, y, Math.min(len, SCENE.w - x), rh, base);
+      s.rect(x, y, Math.min(len, SCENE.w - x), 1, OAK.light); // borde superior iluminado
+      s.rect(x, y + rh - 1, Math.min(len, SCENE.w - x), 1, OAK.grain);
+      s.rect(x + len - 1, y, 1, rh, OAK.grain); // junta
+      for (let k = 0; k < len / 5; k++) s.set(x + Math.floor(rnd(x * 3 + k + r) * len), y + 1 + Math.floor(rnd(k * 9 + r) * (rh - 2)), OAK.grain);
+      x += len;
+    }
+  }
+  // sombra de la pared sobre el piso
+  s.rect(0, 0, SCENE.w, 2, mix(OAK.dark, "#3a2a1c", 0.18));
+  return s;
+}
+
+export function baseboard() {
+  const s = new Sprite(SCENE.w, 4);
+  s.rect(0, 0, SCENE.w, 4, "#fbfbf9");
+  s.rect(0, 0, SCENE.w, 1, "#ffffff");
+  s.rect(0, 3, SCENE.w, 1, "#d9d7d1");
+  s.rect(0, 1, SCENE.w, 1, "#f1efea");
+  return s;
+}
+
 // ------------------------------------------------------------------ ventana
 
-export const GLASS = { x: 3, y: 2, w: 24, h: 28 };
+export const WIN_GLASS = { x: 3, y: 3, w: 34, h: 40 };
 
 /** La calle que se ve por la ventana. */
 export function streetGlass(day: boolean) {
-  const s = new Sprite(GLASS.w, GLASS.h);
-  const roadY = 24;
+  const { w, h } = WIN_GLASS;
+  const s = new Sprite(w, h);
+  const roadY = 33;
+  const skyH = 30;
   if (day) {
-    s.vgradient(0, 0, 24, 23, "#86b5d3", "#d6e8eb");
-    s.ellipse(6, 5, 4, 1.5, "#f6fafa");
-    s.ellipse(8, 4, 2.6, 1.6, "#f6fafa");
-    s.ellipse(19, 9, 3.4, 1.1, "#eef5f6");
-    // edificios lejanos
-    for (const [x, w, top, c] of [
-      [0, 5, 13, "#aab9c6"],
-      [4, 5, 10, "#9eaebd"],
-      [12, 6, 12, "#a5b4c2"],
-      [19, 5, 9, "#9fb0bf"],
-    ] as const) {
-      s.rect(x, top, w, 24 - top, c);
-      for (let y = top + 2; y < 22; y += 3) for (let xx = x + 1; xx < x + w - 1; xx += 2) s.set(xx, y, "#c3d0db");
+    s.vgradient(0, 0, w, skyH, "#7fb7e0", "#d8ecf2");
+    s.ellipse(27, 6, 5, 5, "#fff3c4");
+    s.ellipse(27, 6, 3, 3, "#fffbe3");
+    for (const [cx, cy, rx] of [[7, 6, 5], [11, 5, 3.5], [21, 14, 4.5], [5, 17, 3.6]] as const) {
+      s.ellipse(cx, cy, rx, 1.6, "#f8fcfc");
+      s.ellipse(cx + 1, cy - 1, rx * 0.6, 1.4, "#ffffff");
     }
-    // edificios cercanos
-    s.rect(0, 12, 8, 12, "#b4695a");
-    s.rect(0, 12, 8, 1, "#cf8574");
-    s.rect(9, 9, 8, 15, "#d9c7a6");
-    s.rect(9, 9, 8, 1, "#ece0c4");
-    s.rect(17, 14, 7, 10, "#8a97a8");
-    s.rect(17, 14, 7, 1, "#a3afbd");
-    for (let y = 14; y < 23; y += 3) for (const x of [1, 4, 10, 13, 18, 21]) s.rect(x, y, 2, 2, "#dcebf1");
-    s.rect(1, 17, 2, 1, "#a8c4d2");
-    s.rect(10, 11, 2, 2, "#9bb9c8");
   } else {
-    s.vgradient(0, 0, 24, 23, "#0e1530", "#2b3658");
-    for (let i = 0; i < 16; i++) s.set(Math.floor(rnd(i) * 24), Math.floor(rnd(i + 40) * 12), i % 3 === 0 ? "#f4efd2" : "#9aa3c4");
-    s.ellipse(18, 5, 2.6, 2.6, "#f1ecd0");
-    s.ellipse(19.2, 4.4, 2.3, 2.3, "#16204a");
-    for (const [x, w, top, c] of [
-      [0, 5, 13, "#1c2338"],
-      [4, 5, 10, "#171d31"],
-      [12, 6, 12, "#1b2237"],
-      [19, 5, 9, "#171d31"],
-    ] as const) {
-      s.rect(x, top, w, 24 - top, c);
-    }
-    s.rect(0, 12, 8, 12, "#262e47");
-    s.rect(9, 9, 8, 15, "#2d3652");
-    s.rect(17, 14, 7, 10, "#222a42");
-    let k = 0;
-    for (let y = 14; y < 23; y += 3)
-      for (const x of [1, 4, 10, 13, 18, 21]) {
-        k++;
-        s.rect(x, y, 2, 2, rnd(k * 3 + 1) > 0.45 ? "#f3d98a" : "#1a2036");
+    s.vgradient(0, 0, w, skyH, "#0a1030", "#2a3358");
+    for (let i = 0; i < 34; i++) s.set(Math.floor(rnd(i) * w), Math.floor(rnd(i + 70) * 18), i % 4 === 0 ? "#f4efd2" : i % 3 === 0 ? "#b9c0e0" : "#7d86ad");
+    s.ellipse(26, 7, 4.6, 4.6, "#f3eed2");
+    s.ellipse(27.4, 6.2, 4.2, 4.2, "#101a40");
+    s.ellipse(26.2, 7, 5.5, 5.5, "#2b3560");
+    s.ellipse(26, 7, 4.6, 4.6, "#f3eed2");
+    s.ellipse(27.6, 6.1, 4, 4, "#16204a");
+  }
+  // edificios lejanos (siluetas tenues)
+  const far = day ? ["#b6c7d6", "#a9bccd", "#bccddb"] : ["#1b2238", "#171d31", "#1e2540"];
+  for (let x = 0, i = 0; x < w; i++) {
+    const bw = 5 + Math.floor(rnd(i * 5) * 5);
+    const bh = 9 + Math.floor(rnd(i * 3 + 1) * 10);
+    s.rect(x, 26 - bh + 6, bw, bh, far[i % 3]);
+    x += bw;
+  }
+  // edificios cercanos con ventanas y detalles
+  const near = day
+    ? [["#b8685a", "#d58a76", "#8c4a40"], ["#dccaa8", "#efe2c4", "#b9a883"], ["#8d9bab", "#a9b6c4", "#6b7886"], ["#c7a37e", "#dcc09c", "#9c7e5c"]]
+    : [["#2b2f4a", "#363b5c", "#1d2036"], ["#2f3552", "#3a4163", "#212640"], ["#262b45", "#30365a", "#1a1e34"], ["#2d3350", "#383f62", "#20253c"]];
+  let bx = 0;
+  let bi = 0;
+  while (bx < w) {
+    const bw = 8 + Math.floor(rnd(bi * 7 + 2) * 5);
+    const top = 14 + Math.floor(rnd(bi * 11 + 3) * 7);
+    const [base, hi, lo] = near[bi % near.length];
+    s.rect(bx, top, bw, roadY - top - 2, base);
+    s.rect(bx, top, bw, 1, hi);
+    s.rect(bx + bw - 1, top, 1, roadY - top - 2, lo);
+    s.rect(bx, top - 1, bw, 1, lo); // cornisa
+    if (bi % 2 === 0) s.rect(bx + 2, top - 3, 1, 2, lo); // antena / chimenea
+    for (let wy = top + 3; wy < roadY - 6; wy += 4)
+      for (let wx = bx + 2; wx < bx + bw - 2; wx += 3) {
+        const lit = rnd(wx * 13 + wy * 7) > 0.42;
+        if (day) s.rect(wx, wy, 2, 2, lit ? "#e1eff5" : "#9fb7c6");
+        else s.rect(wx, wy, 2, 2, lit ? "#f3d98a" : "#1a1e34");
+        if (day) s.set(wx, wy, "#ffffff");
       }
+    // local de planta baja
+    s.rect(bx + 1, roadY - 6, bw - 2, 4, day ? "#6e7a86" : "#232844");
+    s.rect(bx + 2, roadY - 5, bw - 4, 2, day ? "#d8e6ee" : "#f0cf80");
+    bx += bw;
+    bi++;
   }
   // vereda, calle y rayas
-  s.rect(0, 22, 24, 2, day ? "#bab5aa" : "#2a2d38");
-  s.rect(0, 23, 24, 1, day ? "#8f8b80" : "#1d2029");
-  s.rect(0, roadY, 24, 4, day ? "#5b5e66" : "#171a22");
-  for (let x = 1; x < 24; x += 6) s.rect(x, 26, 3, 1, day ? "#d9d5c6" : "#4b4f5c");
-  // árbol
-  s.rect(14, 18, 2, 5, day ? "#6b4a35" : "#2a2420");
-  s.ellipse(15, 15.5, 3.4, 3.6, day ? "#6b9a67" : "#223a2b");
-  s.ellipse(14, 14.5, 1.6, 1.4, day ? "#8fb784" : "#2e4c39");
+  s.rect(0, roadY - 2, w, 3, day ? "#c2beb3" : "#34374a");
+  s.rect(0, roadY - 2, w, 1, day ? "#d8d4c9" : "#44485c");
+  s.rect(0, roadY + 1, w, h - roadY - 1, day ? "#585c66" : "#181b26");
+  s.rect(0, roadY + 1, w, 1, day ? "#8b8e94" : "#2a2d3c");
+  for (let x = 2; x < w; x += 8) s.rect(x, roadY + 4, 4, 1, day ? "#e6e2d4" : "#555a6d");
+  // árboles en la vereda
+  for (const tx of [6, 24]) {
+    s.rect(tx, roadY - 9, 2, 8, day ? "#6b4a35" : "#2a2420");
+    s.ellipse(tx + 1, roadY - 12, 4.2, 4.4, day ? "#5f9a63" : "#1f3a2b");
+    s.ellipse(tx - 0.5, roadY - 13, 2.2, 2.2, day ? "#86bb82" : "#2c4d39");
+    s.ellipse(tx + 3, roadY - 11, 2, 2, day ? "#4d8452" : "#193126");
+  }
   // farola
-  s.rect(21, 14, 1, 9, day ? "#3a3d45" : "#4a4e5a");
-  s.rect(20, 13, 3, 1, day ? "#3a3d45" : "#f3e2a8");
-  if (!day) s.tint(21.5, 14, 8, "#f3d98a", 0.7);
-  // peatón
-  s.rect(6, 19, 2, 4, day ? "#3b4a5c" : "#2d3548");
-  s.rect(6, 17, 2, 2, day ? "#d9b18d" : "#7c6a5a");
+  const lx = 15;
+  s.rect(lx, roadY - 15, 1, 14, day ? "#3a3d45" : "#555a6a");
+  s.rect(lx, roadY - 16, 4, 1, day ? "#3a3d45" : "#555a6a");
+  s.rect(lx + 3, roadY - 15, 2, 1, day ? "#c9c5b6" : "#fff0b8");
+  if (!day) {
+    s.tint(lx + 4, roadY - 14, 12, "#f3d98a", 0.75);
+  }
+  // auto estacionado
+  const cx = 2;
+  const cy = roadY + 1;
+  s.rect(cx, cy, 12, 3, day ? "#b9433c" : "#5a2a2c");
+  s.rect(cx + 2, cy - 2, 7, 2, day ? "#b9433c" : "#5a2a2c");
+  s.rect(cx + 3, cy - 1, 2, 1, day ? "#a9d0e6" : "#1b2a46");
+  s.rect(cx + 6, cy - 1, 2, 1, day ? "#a9d0e6" : "#1b2a46");
+  s.rect(cx + 2, cy + 3, 2, 1, "#15161a");
+  s.rect(cx + 8, cy + 3, 2, 1, "#15161a");
   return s;
 }
 
 /** Auto que cruza la calle (se anima con CSS). */
 export function car(day: boolean) {
-  const s = new Sprite(11, 6);
-  const body = day ? "#c9ccd2" : "#454a58";
-  s.rect(0, 3, 11, 2, body);
-  s.rect(2, 1, 7, 2, body);
-  s.rect(3, 2, 2, 1, day ? "#87b4cf" : "#1b2a46");
-  s.rect(6, 2, 2, 1, day ? "#87b4cf" : "#1b2a46");
-  s.rect(1, 5, 2, 1, "#1b1c20");
-  s.rect(8, 5, 2, 1, "#1b1c20");
-  s.set(10, 3, day ? "#f3e2a8" : "#fff3c4");
+  const s = new Sprite(14, 7);
+  const body = day ? "#d9dce2" : "#4b505f";
+  const dark = day ? "#a9aeb8" : "#2f3340";
+  s.rect(0, 3, 14, 3, body);
+  s.rect(2, 1, 9, 2, body);
+  s.rect(0, 5, 14, 1, dark);
+  s.rect(3, 1, 3, 2, day ? "#8fc0dc" : "#1b2a46");
+  s.rect(7, 1, 3, 2, day ? "#8fc0dc" : "#1b2a46");
+  s.rect(1, 5, 3, 2, "#15161a");
+  s.rect(10, 5, 3, 2, "#15161a");
+  s.set(13, 3, day ? "#f3e2a8" : "#fff3c4");
+  s.set(13, 4, day ? "#f3e2a8" : "#fff3c4");
   s.set(0, 3, "#c4554f");
-  return s;
+  return s.outline(C.line);
 }
 
-/** Marco, cruceta, cortinas y alféizar (el vidrio queda transparente). */
+/** Marco blanco de una sola hoja (sin cruceta), cortinas y alféizar. */
 export function windowFrame() {
-  const s = new Sprite(30, 36);
-  s.rect(1, 0, 28, 33, "#efece4");
-  s.rect(1, 0, 28, 1, "#fbfaf6");
-  s.rect(1, 0, 1, 33, "#fbfaf6");
-  s.rect(28, 0, 1, 33, "#cfcabd");
-  s.rect(1, 32, 28, 1, "#cfcabd");
-  s.rect(GLASS.x, GLASS.y, GLASS.w, GLASS.h, null);
-  s.rect(14, 2, 2, 28, "#efece4");
-  s.rect(3, 15, 24, 2, "#efece4");
-  s.rect(14, 2, 1, 28, "#fbfaf6");
-  s.rect(3, 15, 24, 1, "#fbfaf6");
-  // cortinas
-  for (let x = 3; x < 8; x++) s.rect(x, 2, 1, 28, x % 2 ? "#a9b4aa" : "#bcc6bd");
-  for (let x = 22; x < 27; x++) s.rect(x, 2, 1, 28, x % 2 ? "#bcc6bd" : "#a9b4aa");
-  s.rect(3, 18, 5, 1, "#7f8b82");
-  s.rect(22, 18, 5, 1, "#7f8b82");
-  s.rect(3, 2, 24, 1, "#8c978e");
+  const { w, h } = { w: 40, h: 50 };
+  const g = WIN_GLASS;
+  const s = new Sprite(w, h);
+  s.rect(1, 0, w - 2, h - 5, "#f6f5f1");
+  s.rect(1, 0, w - 2, 1, "#ffffff");
+  s.rect(1, 0, 1, h - 5, "#ffffff");
+  s.rect(w - 2, 0, 1, h - 5, "#dad7cf");
+  s.rect(1, h - 6, w - 2, 1, "#dad7cf");
+  s.rect(g.x, g.y, g.w, g.h, null);
+  // sombra interior del marco sobre el vidrio
+  s.rect(g.x, g.y, g.w, 1, "#c9c6bd");
+  s.rect(g.x, g.y, 1, g.h, "#d5d2c9");
+  s.rect(g.x + g.w - 1, g.y, 1, g.h, "#e6e3dc");
+  s.rect(g.x, g.y + g.h - 1, g.w, 1, "#e6e3dc");
+  // cortinas de gasa recogidas a los lados
+  for (let x = 0; x < 6; x++) {
+    const c = x % 3 === 0 ? "#d8dce0" : x % 3 === 1 ? "#eef0f2" : "#e2e5e8";
+    s.rect(g.x + x, g.y + 1, 1, g.h - 2, c);
+    s.rect(g.x + g.w - 1 - x, g.y + 1, 1, g.h - 2, c);
+  }
+  s.rect(g.x, g.y + 24, 6, 2, "#b9bfc6");
+  s.rect(g.x + g.w - 6, g.y + 24, 6, 2, "#b9bfc6");
+  s.rect(g.x, g.y, g.w, 2, "#cfd3d8"); // riel
   // alféizar
-  s.rect(0, 33, 30, 3, "#e2ded3");
-  s.rect(0, 33, 30, 1, "#fbfaf6");
-  s.rect(0, 35, 30, 1, "#b9b3a5");
+  s.rect(0, h - 5, w, 3, "#f1efe9");
+  s.rect(0, h - 5, w, 1, "#ffffff");
+  s.rect(0, h - 3, w, 2, "#cbc8bf");
+  s.rect(0, h - 2, w, 1, "#b3afa5");
   return s;
 }
 
 export function cactus() {
-  const s = new Sprite(8, 9);
-  s.rect(1, 6, 6, 3, "#b8735a");
-  s.rect(1, 6, 6, 1, "#d08b72");
-  s.rect(3, 1, 2, 5, "#5f917a");
+  const s = new Sprite(9, 11);
+  s.rect(1, 7, 7, 4, "#c97b5f");
+  s.rect(1, 7, 7, 1, "#e0967a");
+  s.rect(1, 10, 7, 1, "#9f5c45");
+  s.rect(3, 1, 3, 6, "#5f917a");
+  s.rect(3, 1, 1, 6, "#7db296");
   s.rect(1, 3, 2, 1, "#5f917a");
   s.rect(1, 2, 1, 2, "#5f917a");
-  s.rect(5, 4, 2, 1, "#5f917a");
-  s.rect(6, 3, 1, 2, "#5f917a");
-  s.set(3, 1, "#86b79e");
-  s.set(3, 3, "#86b79e");
-  return s;
+  s.rect(6, 4, 2, 1, "#5f917a");
+  s.rect(7, 3, 1, 2, "#5f917a");
+  s.set(4, 2, "#e8f0d8");
+  s.set(4, 5, "#e8f0d8");
+  return s.outline(C.line);
 }
 
 // --------------------------------------------------------------------- cama
 
+/** Cama de madera clara con almohadas (el edredón va aparte, encima del personaje). */
 export function bedBase() {
-  const s = new Sprite(46, 26);
-  // cabecero y pie
-  s.rect(1, 0, 2, 2, C.wood);
-  s.rect(0, 2, 4, 24, C.wood);
-  s.rect(1, 2, 1, 24, C.woodH);
-  s.rect(3, 2, 1, 24, C.woodL);
-  s.rect(1, 0, 1, 1, C.woodH);
-  s.rect(42, 12, 4, 14, C.wood);
-  s.rect(43, 12, 1, 14, C.woodH);
-  s.rect(45, 12, 1, 14, C.woodL);
-  // colchón y bastidor
-  s.rect(4, 17, 38, 5, "#e6e3da");
-  s.rect(4, 17, 38, 1, "#f6f4ee");
-  s.rect(4, 21, 38, 1, "#cfcbc0");
-  s.rect(4, 22, 38, 3, C.wood);
-  s.rect(4, 22, 38, 1, C.woodH);
-  s.rect(4, 24, 38, 1, C.woodL);
-  s.rect(5, 25, 2, 1, C.woodD);
-  s.rect(39, 25, 2, 1, C.woodD);
-  // almohada
-  s.rect(5, 12, 11, 5, "#f6f4ee");
-  s.rect(6, 11, 9, 1, "#f6f4ee");
-  s.rect(5, 15, 11, 2, "#d9d6cc");
-  s.rect(15, 12, 1, 5, "#d9d6cc");
-  s.set(10, 13, "#e5e2d8");
+  const s = new Sprite(BED.w, BED.h);
+  const top = BED.h - BED.mattress; // fila de la superficie del colchón
+  // cabecero alto con listones
+  s.rect(0, 0, 5, BED.h, WOOD.base);
+  s.rect(0, 0, 1, BED.h, WOOD.hi);
+  s.rect(4, 0, 1, BED.h, WOOD.lo);
+  s.rect(1, 0, 3, 1, WOOD.hi);
+  for (let y = 4; y < top - 2; y += 4) s.rect(1, y, 3, 1, WOOD.lo);
+  // pie de cama
+  s.rect(BED.w - 5, top - 4, 5, BED.h - top + 4, WOOD.base);
+  s.rect(BED.w - 5, top - 4, 1, BED.h - top + 4, WOOD.hi);
+  s.rect(BED.w - 1, top - 4, 1, BED.h - top + 4, WOOD.lo);
+  // somier y patas
+  s.rect(5, top + 9, BED.w - 10, 4, WOOD.base);
+  s.rect(5, top + 9, BED.w - 10, 1, WOOD.hi);
+  s.rect(5, top + 12, BED.w - 10, 1, WOOD.lo);
+  s.rect(6, top + 13, 3, BED.h - top - 13, WOOD.lo);
+  s.rect(BED.w - 10, top + 13, 3, BED.h - top - 13, WOOD.lo);
+  // colchón con funda blanca
+  s.rect(5, top, BED.w - 10, 9, "#eeede9");
+  s.rect(5, top, BED.w - 10, 1, "#ffffff");
+  s.rect(5, top + 7, BED.w - 10, 2, "#d3d1ca");
+  s.rect(5, top + 8, BED.w - 10, 1, "#bdbab1");
+  // almohadas
+  const pillow = (x: number, y: number, w: number, h: number, c: string) => {
+    s.rect(x + 1, y, w - 2, h, c);
+    s.rect(x, y + 1, w, h - 2, c);
+    s.rect(x + 1, y, w - 2, 1, "#ffffff");
+    s.rect(x + 1, y + h - 2, w - 2, 1, "#d6d3cc");
+    s.rect(x + w - 2, y + 2, 1, h - 3, "#dedbd4");
+    s.set(x + (w >> 1), y + (h >> 1), "#e4e1da");
+  };
+  pillow(6, top - 7, 13, 8, "#f6f5f2");
+  pillow(10, top - 11, 12, 7, "#ecebe6");
   return s.outline(C.line);
 }
 
-/** Manta: se dibuja ENCIMA del personaje para que quede tapado. */
-export function bedBlanket() {
-  const s = new Sprite(46, 26);
-  s.rect(17, 12, 25, 11, C.blanket);
-  s.rect(17, 12, 25, 3, "#ece9e1");
-  s.rect(17, 14, 25, 1, "#cfcbc0");
-  s.rect(17, 15, 25, 1, C.blanketH);
-  for (let x = 19; x < 41; x += 5) s.rect(x, 17, 2, 5, C.blanketH);
-  for (let x = 21; x < 41; x += 5) s.rect(x, 17, 1, 5, C.blanketL);
-  s.rect(17, 21, 25, 2, C.blanketL);
-  s.rect(17, 12, 1, 11, C.blanketL);
-  s.rect(41, 12, 1, 11, C.blanketL);
-  // pliegue sobre las piernas
-  s.line(24, 16, 30, 19, C.blanketL);
-  s.line(33, 16, 37, 19, C.blanketL);
+export type BlanketMode = "flat" | "legs" | "knees";
+
+/** Edredón que cubre la parte baja del cuerpo (va ENCIMA del personaje). */
+export function bedBlanket(mode: BlanketMode) {
+  const s = new Sprite(BED.w, BED.h);
+  const top = BED.h - BED.mattress;
+  const x0 = mode === "flat" ? 24 : 17;
+  const x1 = BED.w - 6;
+  const smooth = (a: number, b: number, x: number) => {
+    const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
+  // perfil superior del edredón (altura sobre el colchón)
+  const prof = (x: number) => {
+    if (mode === "flat") return 2;
+    if (mode === "legs") return 2 + 8 * smooth(17, 23, x) * (1 - smooth(44, 50, x));
+    const k1 = Math.exp(-Math.pow((x - 41) / 6, 2)) * 13;
+    const k2 = Math.exp(-Math.pow((x - 46) / 5, 2)) * 11;
+    return 3 + Math.max(k1, k2);
+  };
+  for (let x = x0; x <= x1; x++) {
+    const hgt = Math.round(prof(x));
+    s.rect(x, top - hgt + 1, 1, hgt + 5, C.blanket);
+    s.set(x, top - hgt + 1, C.blanketH);
+    s.set(x, top - hgt + 2, C.blanketH);
+  }
+  // borde doblado (sábana blanca)
+  for (let x = x0; x <= x1; x++) {
+    const hgt = Math.round(prof(x));
+    s.rect(x, top - hgt + 1, 1, 2, "#eceae4");
+    s.set(x, top - hgt + 3, "#c9c6bd");
+  }
+  // caída lateral del edredón sobre el costado de la cama
+  s.rect(x0, top + 2, x1 - x0 + 1, 7, C.blanket);
+  s.rect(x0, top + 2, x1 - x0 + 1, 1, C.blanketH);
+  s.rect(x0, top + 7, x1 - x0 + 1, 2, C.blanketL);
+  for (let x = x0 + 3; x < x1 - 1; x += 6) {
+    s.rect(x, top + 3, 1, 5, C.blanketL);
+    s.rect(x + 1, top + 3, 1, 4, C.blanketH);
+  }
+  if (mode === "knees") {
+    s.line(34, top - 2, 38, top + 3, C.blanketL);
+    s.line(43, top - 6, 47, top + 3, C.blanketL);
+  }
+  if (mode === "legs") s.line(28, top - 5, 36, top + 1, C.blanketL);
+  s.rect(x1, top - 1, 2, 11, C.blanketL);
   return s.outline(C.line);
 }
 
-// ------------------------------------------------------------- escritorio
+// ------------------------------------------------------------------ librero
+
+export function bookcase(gap: boolean) {
+  const s = new Sprite(BOOKCASE.w, BOOKCASE.h);
+  s.rect(0, 0, BOOKCASE.w, BOOKCASE.h, WOOD.lo);
+  s.rect(1, 1, BOOKCASE.w - 2, BOOKCASE.h - 2, "#7a5738");
+  s.rect(0, 0, BOOKCASE.w, 1, WOOD.hi);
+  s.rect(0, 0, 1, BOOKCASE.h, WOOD.base);
+  s.rect(BOOKCASE.w - 1, 0, 1, BOOKCASE.h, WOOD.dark);
+  const shelfYs = [0, 12, 24, 36, 48];
+  const palette = ["#7d8fa3", "#c9a66b", "#6f8f7d", "#a3685e", "#5d6f8f", "#d6c9a8", "#8a6f9a", "#9fb27a", "#c98f6a"];
+  let seed = 3;
+  shelfYs.forEach((sy, si) => {
+    const baseY = sy + 12;
+    s.rect(1, baseY - 1, BOOKCASE.w - 2, 2, WOOD.base);
+    s.rect(1, baseY - 1, BOOKCASE.w - 2, 1, WOOD.hi);
+    s.rect(1, sy + 1, BOOKCASE.w - 2, 1, "#5e4229"); // sombra bajo la tabla superior
+    let x = 2;
+    while (x < BOOKCASE.w - 3) {
+      const bw = 2 + Math.floor(rnd(seed++) * 2);
+      const bh = 6 + Math.floor(rnd(seed++) * 4);
+      const col = palette[Math.floor(rnd(seed++) * palette.length)];
+      if (gap && si === 2 && x >= 9 && x < 12) {
+        x += bw;
+        continue;
+      }
+      if (si === 4 && x > 9) break; // el estante de arriba tiene espacio libre
+      s.rect(x, baseY - 1 - bh, bw, bh, col);
+      s.rect(x, baseY - 1 - bh, 1, bh, mix(col, "#ffffff", 0.28));
+      s.rect(x + bw - 1, baseY - 1 - bh, 1, bh, mix(col, "#000000", 0.25));
+      s.set(x, baseY - 1 - bh + 2, mix(col, "#ffffff", 0.55));
+      x += bw;
+    }
+  });
+  // planta y marco encima
+  s.rect(3, BOOKCASE.h - 1, 0, 0, null);
+  return s.outline(C.line);
+}
+
+export function topPlant() {
+  const s = new Sprite(14, 14);
+  s.rect(4, 9, 7, 5, "#cfcbc0");
+  s.rect(4, 9, 7, 1, "#e9e6dd");
+  s.rect(4, 13, 7, 1, "#9c988d");
+  s.ellipse(7.5, 5, 3, 4.6, "#4f8a6f");
+  s.ellipse(4, 6.5, 2.4, 3.2, "#5f9d7e");
+  s.ellipse(11, 6.5, 2.4, 3.2, "#5f9d7e");
+  s.set(7, 2, "#8cc9a8");
+  s.set(4, 4, "#8cc9a8");
+  s.set(11, 4, "#8cc9a8");
+  s.rect(7, 8, 1, 3, "#2f5a47");
+  return s.outline(C.line);
+}
+
+// ---------------------------------------------------------------- escritorio
 
 export function desk(gamer: boolean) {
-  const s = new Sprite(34, 20);
-  const top = gamer ? "#2f323a" : C.wood;
-  const topH = gamer ? "#454952" : C.woodH;
-  const topL = gamer ? "#1d1f24" : C.woodL;
-  s.rect(0, 0, 34, 3, top);
-  s.rect(0, 0, 34, 1, topH);
-  s.rect(0, 3, 34, 1, topL);
+  const w = DESK_BOX.w;
+  const h = DESK_BOX.h;
+  const s = new Sprite(w, h);
+  const top = gamer ? "#2f323a" : "#d9bf98";
+  const topH = gamer ? "#454952" : "#ebd5b3";
+  const topL = gamer ? "#1d1f24" : "#a98a62";
+  const body = gamer ? "#272a31" : "#c3a47a";
+  s.rect(0, 0, w, 3, top);
+  s.rect(0, 0, w, 1, topH);
+  s.rect(0, 3, w, 1, topL);
   // pata izquierda
-  s.rect(1, 4, 2, 16, gamer ? "#272a31" : C.woodL);
-  s.rect(1, 4, 1, 16, gamer ? "#3a3e47" : C.wood);
+  s.rect(1, 4, 2, h - 4, gamer ? "#272a31" : "#a98a62");
+  s.rect(1, 4, 1, h - 4, gamer ? "#3a3e47" : "#c3a47a");
   // cajonera derecha
-  s.rect(19, 4, 14, 16, gamer ? "#272a31" : C.wood);
-  s.rect(19, 4, 14, 1, topL);
-  s.rect(19, 4, 1, 16, gamer ? "#3a3e47" : C.woodH);
-  s.rect(32, 4, 1, 16, topL);
-  for (const y of [5, 10, 15]) {
-    s.rect(21, y, 10, 4, gamer ? "#30333b" : "#97704f");
-    s.rect(21, y, 10, 1, gamer ? "#454952" : C.woodH);
-    s.rect(25, y + 1, 2, 1, C.metalH);
+  const cw = 12;
+  s.rect(w - cw - 1, 4, cw, h - 4, body);
+  s.rect(w - cw - 1, 4, cw, 1, topL);
+  s.rect(w - cw - 1, 4, 1, h - 4, gamer ? "#3a3e47" : topH);
+  s.rect(w - 2, 4, 1, h - 4, topL);
+  const dh = Math.floor((h - 5) / 3);
+  for (let i = 0; i < 3; i++) {
+    const y = 5 + i * dh;
+    s.rect(w - cw + 1, y, cw - 3, dh - 1, gamer ? "#30333b" : "#d2b78e");
+    s.rect(w - cw + 1, y, cw - 3, 1, gamer ? "#454952" : "#ebd5b3");
+    s.rect(w - cw + 4, y + 2, 4, 1, C.metalH);
   }
   if (gamer) {
-    s.rect(0, 3, 34, 1, C.sage);
-    s.rect(19, 4, 1, 16, C.sage);
-    s.rect(32, 4, 1, 16, C.sage);
+    s.rect(0, 3, w, 1, C.sage);
+    s.rect(w - cw - 1, 4, 1, h - 4, C.sage);
   }
   return s.outline(C.line);
 }
 
 export function monitor() {
-  const s = new Sprite(20, 15);
-  s.rect(0, 0, 20, 12, "#16171a");
-  s.rect(1, 1, 18, 10, "#1d2430");
-  const rows: [number, number, string][] = [
-    [2, 8, C.sage],
-    [4, 11, "#8b909a"],
-    [6, 6, C.sand],
-    [8, 10, "#8b909a"],
-  ];
+  const s = new Sprite(22, 16);
+  s.rect(0, 0, 22, 13, "#16171a");
+  s.rect(1, 1, 20, 11, "#1d2430");
+  const rows: [number, number, string][] = [[2, 9, C.sage], [4, 13, "#8b909a"], [6, 7, C.sand], [8, 12, "#8b909a"]];
   for (const [y, w, c] of rows) s.rect(3, y + 1, w, 1, c);
-  s.rect(9, 12, 2, 2, C.metalL);
-  s.rect(6, 14, 8, 1, C.metal);
-  s.rect(0, 11, 20, 1, C.sage);
+  s.rect(10, 13, 2, 2, C.metalL);
+  s.rect(7, 15, 8, 1, C.metal);
+  s.rect(0, 12, 22, 1, C.sage);
   return s.outline(C.line);
 }
 
+/** Silla de oficina; la altura del asiento sale de la pose sentada. */
 export function chair() {
-  const s = new Sprite(14, 24);
-  s.rect(0, 2, 3, 12, "#3a3d45");
-  s.rect(0, 2, 1, 12, "#4d515b");
-  s.rect(1, 1, 2, 1, "#3a3d45");
-  s.rect(0, 13, 13, 3, "#4a4e58");
-  s.rect(0, 13, 13, 1, "#60656f");
-  s.rect(6, 16, 2, 5, C.metal);
-  s.rect(2, 21, 10, 1, C.metalL);
-  s.rect(2, 22, 2, 2, "#2a2c32");
-  s.rect(10, 22, 2, 2, "#2a2c32");
-  s.rect(6, 22, 2, 2, "#2a2c32");
+  const s = new Sprite(CHAIR_BOX.w, CHAIR_BOX.h);
+  const seatY = CHAIR_BOX.h - SEAT_H; // fila del asiento
+  // respaldo curvo
+  s.rect(0, 1, 4, seatY - 2, "#3a3d45");
+  s.rect(0, 1, 1, seatY - 2, "#555a66");
+  s.rect(3, 1, 1, seatY - 2, "#2a2c32");
+  s.rect(1, 0, 3, 1, "#3a3d45");
+  s.rect(1, seatY - 3, 3, 3, "#2a2c32");
+  // asiento acolchado
+  s.rect(0, seatY, 13, 3, "#4a4e58");
+  s.rect(0, seatY, 13, 1, "#6b7080");
+  s.rect(0, seatY + 2, 13, 1, "#2f3239");
+  // pistón y base
+  s.rect(6, seatY + 3, 2, CHAIR_BOX.h - seatY - 6, C.metal);
+  s.rect(6, seatY + 3, 1, CHAIR_BOX.h - seatY - 6, C.metalH);
+  s.rect(1, CHAIR_BOX.h - 3, 12, 1, C.metalL);
+  for (const x of [1, 6, 11]) s.rect(x, CHAIR_BOX.h - 2, 2, 2, "#2a2c32");
   return s.outline(C.line);
 }
 
 export function laptopSide() {
-  const s = new Sprite(14, 11);
-  s.rect(0, 9, 13, 2, C.metalH);
-  s.rect(0, 10, 13, 1, C.metalL);
-  s.limb(10, 9, 12.5, 1, 2, "#b9bcc2");
-  s.line(9, 8, 11, 1, "#e6f1f6");
-  s.set(12, 5, "#e3e5e8");
+  const s = new Sprite(16, 13);
+  s.rect(0, 11, 14, 2, C.metalH);
+  s.rect(0, 12, 14, 1, C.metalL);
+  s.rect(0, 11, 14, 1, "#dfe1e5");
+  s.limb(12, 11, 14.5, 1, 2, "#b9bcc2");
+  s.line(11, 10, 13, 1, "#cfe6f2"); // pantalla encendida hacia el usuario
+  s.set(14, 6, "#e3e5e8");
   return s.outline(C.line);
 }
 
 export function deskTrinkets() {
-  const s = new Sprite(18, 8);
-  // teléfono
-  s.rect(0, 6, 4, 1, "#25272d");
-  s.rect(1, 6, 2, 1, "#cfe6f2");
-  // cuaderno
-  s.rect(6, 4, 7, 3, "#3c4656");
-  s.rect(6, 6, 7, 1, "#f1efe9");
-  s.rect(11, 4, 1, 3, "#1c1f26");
-  // billetera
-  s.rect(9, 2, 5, 2, "#6b4a35");
-  s.rect(9, 2, 5, 1, "#8f6a4f");
+  const s = new Sprite(10, 9);
+  s.rect(0, 7, 4, 1, "#25272d");
+  s.rect(1, 7, 2, 1, "#cfe6f2");
+  s.rect(0, 5, 8, 3, "#3c4656");
+  s.rect(0, 7, 8, 1, "#f1efe9");
+  s.rect(5, 5, 1, 3, "#1c1f26");
+  s.rect(5, 2, 5, 3, "#6b4a35");
+  s.rect(5, 2, 5, 1, "#8f6a4f");
   return s.outline(C.line);
 }
 
 export function deskLamp() {
-  const s = new Sprite(9, 16);
-  s.rect(1, 14, 6, 2, C.dark);
-  s.limb(4, 14, 3, 6, 1, C.metal);
-  s.limb(3, 6, 7, 3, 1, C.metal);
-  s.rect(5, 3, 4, 3, C.dark);
-  s.rect(6, 6, 2, 1, C.warm);
+  const s = new Sprite(11, 19);
+  s.rect(1, 17, 7, 2, C.dark);
+  s.rect(1, 17, 7, 1, "#4a4d55");
+  s.limb(4, 17, 3, 7, 1, C.metal);
+  s.limb(3, 7, 8, 3, 1, C.metal);
+  s.rect(6, 2, 5, 4, C.dark);
+  s.rect(6, 2, 5, 1, "#4a4d55");
+  s.rect(7, 6, 3, 1, C.warm);
   return s.outline(C.line);
 }
 
@@ -292,77 +465,99 @@ export function deskLamp() {
 /** Tablero con el heatmap real (niveles 0..4, null = día futuro). */
 export function board(levels: (number | null)[][]) {
   const s = new Sprite(32, 31);
-  s.rect(0, 0, 32, 31, C.woodL);
-  s.rect(1, 1, 30, 29, C.wood);
-  s.rect(2, 2, 28, 27, "#ece8de");
-  s.rect(2, 2, 28, 1, "#cfcabd");
-  s.rect(2, 28, 28, 1, "#cfcabd");
-  // título
+  s.rect(0, 0, 32, 31, WOOD.lo);
+  s.rect(1, 1, 30, 29, WOOD.base);
+  s.rect(1, 1, 30, 1, WOOD.hi);
+  s.rect(2, 2, 28, 27, "#f3f1ea");
+  s.rect(2, 2, 28, 1, "#d9d6cc");
+  s.rect(2, 28, 28, 1, "#d9d6cc");
   s.rect(4, 4, 8, 1, "#8b909a");
   s.rect(14, 4, 4, 1, "#c6c9cf");
-  const palette = ["#d9d5c9", "#bcd8c9", "#8fbfa5", "#5fa585", "#3f8a6b"];
+  const palette = ["#dedbd1", "#bcd8c9", "#8fbfa5", "#5fa585", "#3f8a6b"];
   levels.forEach((week, w) =>
     week.forEach((lvl, d) => {
       if (lvl === null) return;
       s.rect(4 + w * 3, 7 + d * 3, 2, 2, palette[lvl]);
     }),
   );
-  // chinches
   s.set(2, 1, "#c4554f");
   s.set(29, 1, "#c4554f");
   return s.outline(C.line);
 }
 
-export function shelf() {
-  const s = new Sprite(28, 12);
-  s.rect(0, 9, 28, 3, C.wood);
-  s.rect(0, 9, 28, 1, C.woodH);
-  s.rect(0, 11, 28, 1, C.woodL);
-  const books: [number, number, string][] = [
-    [2, 8, "#7d8fa3"],
-    [5, 7, "#c9a66b"],
-    [8, 9, "#6f8f7d"],
-    [11, 6, "#a3685e"],
-  ];
-  for (const [x, h, c] of books) {
-    s.rect(x, 9 - h, 3, h, c);
-    s.rect(x, 9 - h, 1, h, mix(c, "#ffffff", 0.25));
+export function frame(variant: number) {
+  const s = new Sprite(14, 18);
+  s.rect(0, 0, 14, 18, "#2d2a27");
+  s.rect(1, 1, 12, 16, "#f6f4ee");
+  if (variant === 0) {
+    s.vgradient(2, 2, 10, 14, "#9cc3d9", "#e8d9b4");
+    s.rect(2, 11, 10, 5, "#6f8f7d");
+    s.ellipse(8, 7, 2.2, 2.2, "#f3d98a");
+    s.rect(2, 13, 10, 3, "#587a69");
+  } else {
+    s.rect(2, 2, 10, 14, "#e8e2d4");
+    s.ellipse(7, 9, 3.4, 3.4, "#cf7f78");
+    s.ellipse(7, 9, 1.6, 1.6, "#f1ece0");
+    s.rect(3, 13, 8, 1, "#8b909a");
   }
-  s.limb(14, 8, 17, 4, 1, C.sageD); // libro inclinado
-  s.rect(16, 5, 3, 4, "#8a97a8");
-  // maceta
-  s.rect(21, 5, 5, 4, "#b8735a");
-  s.rect(21, 5, 5, 1, "#d08b72");
-  s.ellipse(23.5, 2.5, 3, 2.4, "#5f917a");
-  s.set(22, 1, "#86b79e");
-  s.set(25, 2, "#86b79e");
+  s.rect(0, 0, 14, 1, "#4a4540");
   return s.outline(C.line);
 }
 
 export function clock(h: number, m: number) {
-  const s = new Sprite(12, 12);
-  s.ellipse(6, 6, 5.6, 5.6, C.line);
-  s.ellipse(6, 6, 4.8, 4.8, "#f3f1ea");
-  for (const [x, y] of [
-    [6, 2],
-    [10, 6],
-    [6, 10],
-    [2, 6],
-  ] as const)
-    s.set(x, y, "#8b909a");
+  const s = new Sprite(14, 14);
+  s.ellipse(7, 7, 6.6, 6.6, C.line);
+  s.ellipse(7, 7, 5.8, 5.8, "#f8f7f3");
+  s.ellipse(7, 7, 5.8, 5.8, "#f8f7f3");
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    s.set(7 + Math.cos(a) * 4.6, 7 + Math.sin(a) * 4.6, i % 3 === 0 ? "#3a3d45" : "#a5a8b0");
+  }
   const ma = (m / 60) * Math.PI * 2 - Math.PI / 2;
   const ha = (((h % 12) + m / 60) / 12) * Math.PI * 2 - Math.PI / 2;
-  s.line(6, 6, 6 + Math.cos(ha) * 2.4, 6 + Math.sin(ha) * 2.4, C.line);
-  s.line(6, 6, 6 + Math.cos(ma) * 3.8, 6 + Math.sin(ma) * 3.8, "#5d6270");
-  s.set(6, 6, C.sageD);
+  s.line(7, 7, 7 + Math.cos(ha) * 3, 7 + Math.sin(ha) * 3, C.line);
+  s.line(7, 7, 7 + Math.cos(ma) * 4.4, 7 + Math.sin(ma) * 4.4, "#4b5060");
+  s.set(7, 7, C.sageD);
   return s;
 }
 
+// ------------------------------------------------------------------ alfombra
+
 export function rug() {
-  const s = new Sprite(44, 7);
-  s.ellipse(22, 3.5, 22, 3.5, "#6f7e7a");
-  s.ellipse(22, 3.5, 20, 2.8, "#8d9d98");
-  s.ellipse(22, 3.5, 14, 1.8, "#a3b2ad");
-  for (let x = 6; x < 38; x += 4) s.set(x, 3, "#8d9d98");
+  const s = new Sprite(RUG_BOX.w, RUG_BOX.h);
+  const cx = RUG_BOX.w / 2;
+  const cy = RUG_BOX.h / 2;
+  s.ellipse(cx, cy, cx, cy, "#7f8f8b");
+  s.ellipse(cx, cy, cx - 1.5, cy - 1, "#9aaaa5");
+  s.ellipse(cx, cy, cx - 6, cy - 2, "#b5c4bf");
+  s.ellipse(cx, cy, cx - 12, cy - 3, "#9aaaa5");
+  for (let x = 6; x < RUG_BOX.w - 6; x += 4) s.set(x, cy, "#7f8f8b");
   return s;
+}
+
+export function cushion() {
+  const s = new Sprite(CUSHION.w, CUSHION.h);
+  const h = CUSHION.h;
+  s.ellipse(CUSHION.w / 2, h - h / 2, CUSHION.w / 2, h / 2, "#cf8f78");
+  s.ellipse(CUSHION.w / 2, h - h / 2 - 0.8, CUSHION.w / 2 - 1.5, h / 2 - 1, "#e0a58d");
+  s.rect(CUSHION.w / 2 - 1, 1, 2, 1, "#b87560");
+  return s.outline(C.line);
+}
+
+export function floorPlant() {
+  const s = new Sprite(12, 30);
+  s.rect(2, 22, 8, 8, "#d8d4c9");
+  s.rect(2, 22, 8, 1, "#efece3");
+  s.rect(2, 29, 8, 1, "#a6a297");
+  s.rect(9, 23, 1, 6, "#bdb9ae");
+  const leaf = (x: number, y: number, len: number, lean: number) => {
+    s.limb(x, y, x + lean, y - len, 2, "#3f7a5e");
+    s.limb(x, y, x + lean, y - len, 1, "#5da283");
+  };
+  leaf(5, 22, 20, -2);
+  leaf(6, 22, 22, 0);
+  leaf(7, 22, 17, 3);
+  leaf(4, 22, 14, -4);
+  leaf(8, 22, 12, 4);
+  return s.outline(C.line);
 }

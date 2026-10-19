@@ -47,6 +47,7 @@ const unitStep = () => {
 export default function Stage({ cam, animate, backdrop, render }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [u, setU] = useState(3);
+  const [cw, setCw] = useState(0);
   const [lastProp, setLastProp] = useState(cam);
   const [view, setView] = useState<View>({ cam, transition: false, settled: true, pending: null });
 
@@ -54,7 +55,11 @@ export default function Stage({ cam, animate, backdrop, render }: Props) {
     const el = ref.current;
     if (!el) return;
     const ro = new ResizeObserver(([entry]) => {
-      setU(Math.max(unitStep(), Math.floor(entry.contentRect.width / (SCENE.w * unitStep())) * unitStep()));
+      const k = unitStep();
+      const w = entry.contentRect.width;
+      // se tolera recortar unos píxeles en los bordes para mantener una escala entera
+      setU(Math.max(k, Math.floor((w + 20) / (SCENE.w * k)) * k));
+      setCw(w);
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -84,6 +89,7 @@ export default function Stage({ cam, animate, backdrop, render }: Props) {
   const step = unitStep();
   const W = SCENE.w * u;
   const H = SCENE.h * u;
+  const VW = cw > 0 ? Math.min(W, cw) : W; // ancho visible
   const c = view.cam;
   const cell = Math.max(u, Math.round((u * c.s) / step) * step);
   const snap = (v: number) => Math.round(v / step) * step;
@@ -98,7 +104,7 @@ export default function Stage({ cam, animate, backdrop, render }: Props) {
     style = {
       width: W2,
       height: H2,
-      transform: `translate(${snap(Math.min(0, Math.max(W - W2, W / 2 - c.cx * u2)))}px, ${snap(
+      transform: `translate(${snap(Math.min(0, Math.max(VW - W2, VW / 2 - c.cx * u2)))}px, ${snap(
         Math.min(0, Math.max(H - H2, H / 2 - c.cy * u2)),
       )}px)`,
     };
@@ -109,7 +115,7 @@ export default function Stage({ cam, animate, backdrop, render }: Props) {
       width: W,
       height: H,
       transformOrigin: "0 0",
-      transform: `translate(${snap(Math.min(0, Math.max(W * (1 - s), W / 2 - c.cx * u * s)))}px, ${snap(
+      transform: `translate(${snap(Math.min(0, Math.max(VW - W * s, VW / 2 - c.cx * u * s)))}px, ${snap(
         Math.min(0, Math.max(H * (1 - s), H / 2 - c.cy * u * s)),
       )}px) scale(${s})`,
       transition: view.transition ? `transform ${ZOOM_MS}ms cubic-bezier(.4,0,.2,1)` : "none",
@@ -120,7 +126,7 @@ export default function Stage({ cam, animate, backdrop, render }: Props) {
 
   return (
     <div ref={ref} className="w-full" style={{ background: backdrop }}>
-      <div className="relative mx-auto overflow-hidden" style={{ width: W, height: H }}>
+      <div className="relative mx-auto overflow-hidden" style={{ width: VW, height: H }}>
         <div style={style}>{inner}</div>
       </div>
     </div>

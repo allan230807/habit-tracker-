@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import * as logic from "@/lib/gameLogic";
-import type { GameState, SpriteState, StatKey } from "@/lib/types";
+import type { GameState, StatKey } from "@/lib/types";
 
 /*
  * Store único respaldado por localStorage. En la primera carga (no hay JSON
@@ -64,9 +64,9 @@ const actions = {
   toggleHabit: (id: string) => update((s) => logic.toggleHabit(s, id, today())),
   addHabit: (name: string, stat: StatKey) => update((s) => logic.addHabit(s, name, stat)),
   removeHabit: (id: string) => update((s) => logic.removeHabit(s, id)),
-  addGoal: (name: string, targetHours: number) => update((s) => logic.addGoal(s, name, targetHours)),
+  addGoal: (name: string, targetHours: number, stat: StatKey) =>
+    update((s) => logic.addGoal(s, name, targetHours, stat)),
   removeGoal: (id: string) => update((s) => logic.removeGoal(s, id)),
-  setSprite: (st: SpriteState) => update((s) => logic.setSprite(s, st)),
   startStopwatch: (goalId: string) => update((s) => logic.startStopwatch(s, goalId, Date.now())),
   stopStopwatch: () => update((s) => logic.stopStopwatch(s, Date.now())),
   cancelStopwatch: () => update(logic.cancelStopwatch),

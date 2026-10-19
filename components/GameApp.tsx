@@ -1,51 +1,42 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { useNow } from "@/hooks/useNow";
-import { ROOM_ZOOM, camForSprite, useStageNav, type Section } from "@/hooks/useStageNav";
+import { ROOM_ZOOM, useStageNav, type Section } from "@/hooks/useStageNav";
+import { setActorInputs } from "@/lib/actor/store";
 import type { DeskItem } from "@/lib/art/desk";
-import {
-  computeProgress,
-  dateKey,
-  dayNumber,
-  hasGamerDesk,
-  heatLevels,
-  isDaytime,
-  SPRITE_LABELS,
-} from "@/lib/gameLogic";
+import { computeProgress, dateKey, dayNumber, hasGamerDesk, heatLevels, isDaytime, isSleepTime } from "@/lib/gameLogic";
+import { mix } from "@/lib/pixel";
 import DeskScene from "./scenes/DeskScene";
 import RoomScene from "./scenes/RoomScene";
-import ActivitySection from "./sections/ActivitySection";
 import GoalsSection from "./sections/GoalsSection";
 import HabitsSection from "./sections/HabitsSection";
 import StatsSection from "./sections/StatsSection";
 import TodoSection from "./sections/TodoSection";
 import WalletSection from "./sections/WalletSection";
 import Stage from "./Stage";
-import { mix } from "@/lib/pixel";
 import { ProgressBar } from "./ui";
 
-const SECTION_LABEL: Record<Section, string> = {
-  habits: "Tablero",
-  activity: "Cama",
-  goals: "Macbook",
-  stats: "Teléfono",
-  todo: "Cuaderno",
+const SECTION_TITLE: Record<Section, string> = {
+  habits: "Hábitos de hoy",
+  goals: "Metas y cronómetro",
+  stats: "Estadísticas",
+  todo: "Tareas de mañana",
   wallet: "Cartera",
 };
 
 /** Colores de pared/piso para los márgenes del escenario. */
 function backdropFor(scene: "room" | "desk", day: boolean, gamer: boolean) {
-  const night = (c: string, a: number) => mix(c, "#0a0e22", a);
-  const wallA = day ? "#ddd6c9" : night("#2b2f38", 0.38);
-  const wallB = day ? "#cfc8ba" : night("#262a32", 0.38);
-  const trim = day ? "#f1ede4" : night("#555a66", 0.38);
+  const night = (c: string, a: number) => (day ? c : mix(c, "#0e1430", a));
+  const wallA = night("#f7f6f3", 0.46);
+  const wallB = night("#ebe9e4", 0.46);
+  const trim = night("#fbfbf9", 0.46);
   if (scene === "room") {
-    const floor = day ? "#b48f69" : night("#40362d", 0.38);
-    return `linear-gradient(to bottom, ${wallA} 0, ${wallB} 83%, ${trim} 83%, ${trim} 85%, ${floor} 85%)`;
+    const floor = night("#c9a47a", 0.46);
+    return `linear-gradient(to bottom, ${wallA} 0, ${wallB} 82%, ${trim} 82%, ${trim} 84%, ${floor} 84%)`;
   }
-  const wood = gamer ? "#30333b" : day ? "#9a7351" : night("#6b4f38", 0.34);
+  const wood = gamer ? "#30333b" : night("#cfae82", 0.3);
   return `linear-gradient(to bottom, ${wallA} 0, ${wallB} 12%, ${trim} 12%, ${trim} 14%, ${wood} 14%)`;
 }
 
@@ -64,7 +55,14 @@ function Elapsed({ since }: { since: number }) {
 export default function GameApp() {
   const { state, actions } = useGameEngine();
   const now = useNow(60_000);
-  const { nav, enterDesk, leaveDesk, open, closeSection, openItem, setCam } = useStageNav();
+  const { nav, enterDesk, leaveDesk, open, closeSection, openItem } = useStageNav();
+
+  const working = !!state?.stopwatch;
+  const hour = new Date(now).getHours();
+  useEffect(() => {
+    if (!now) return;
+    setActorInputs({ night: isSleepTime(hour), working });
+  }, [now, hour, working]);
 
   const today = dateKey(new Date(now));
   const heat = useMemo(() => (state ? heatLevels(state, today, 9) : []), [state, today]);
@@ -83,34 +81,15 @@ export default function GameApp() {
   const p = computeProgress(state);
   const sw = state.stopwatch;
 
-  // ------------------------------------------------------------ migas de pan
-  const crumbs: { label: string; onClick?: () => void }[] = [];
   const atHome = nav.scene === "room" && !nav.section;
-  if (!atHome) {
-    crumbs.push({ label: "Habitación", onClick: nav.scene === "desk" ? leaveDesk : closeSection });
-    if (nav.scene === "desk") crumbs.push({ label: "Escritorio", onClick: nav.section ? closeSection : undefined });
-    if (nav.section) crumbs.push({ label: SECTION_LABEL[nav.section] });
-  }
+  const goBack = nav.section ? closeSection : leaveDesk;
+  const showHome = nav.scene === "desk" && !!nav.section;
 
   const props = { state, actions, today };
   let panel: ReactNode;
   switch (nav.section) {
     case "habits":
       panel = <HabitsSection {...props} />;
-      break;
-    case "activity":
-      panel = (
-        <ActivitySection
-          {...props}
-          actions={{
-            ...actions,
-            setSprite: (st) => {
-              actions.setSprite(st);
-              setCam(camForSprite(st));
-            },
-          }}
-        />
-      );
       break;
     case "goals":
       panel = <GoalsSection {...props} />;
@@ -129,16 +108,9 @@ export default function GameApp() {
         nav.scene === "desk" ? (
           <DeskMenu onPick={openItem} />
         ) : (
-          <Home
-            state={state}
-            today={today}
-            onHabits={() => open("habits", ROOM_ZOOM.board)}
-            onDesk={enterDesk}
-          />
+          <Home state={state} today={today} onHabits={() => open("habits", ROOM_ZOOM.board)} onDesk={enterDesk} />
         );
   }
-
-  const doneCount = state.habits.filter((h) => h.history.includes(today)).length;
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-[560px] flex-col pb-[env(safe-area-inset-bottom)]">
@@ -151,7 +123,7 @@ export default function GameApp() {
         </div>
       </header>
 
-      <div className="relative bg-black/20">
+      <div className="relative">
         <Stage
           cam={nav.cam}
           animate={nav.animate}
@@ -164,70 +136,72 @@ export default function GameApp() {
                   day={day}
                   hour={date.getHours()}
                   minute={date.getMinutes()}
-                  sprite={state.currentState}
                   gamer={gamer}
                   heat={heat}
-                  labels={!nav.section}
+                  hints={!nav.section}
                   onDesk={enterDesk}
                   onBoard={() => open("habits", ROOM_ZOOM.board)}
-                  onBed={() => open("activity", ROOM_ZOOM.bed)}
                 />
               ) : (
-                <DeskScene
-                  u={u}
-                  day={day}
-                  gamer={gamer}
-                  startedAt={sw?.startedAt ?? null}
-                  coins={state.coins}
-                  labels={!nav.section}
-                  onItem={openItem}
-                />
+                <DeskScene u={u} day={day} gamer={gamer} startedAt={sw?.startedAt ?? null} hints={!nav.section} onItem={openItem} />
               )}
             </div>
           )}
         />
+
+        {/* botones grandes para volver, siempre a la vista */}
+        {!atHome && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-50 flex items-start justify-between gap-2 p-3">
+            <button onClick={goBack} className="pointer-events-auto flex min-h-11 items-center gap-1.5 rounded-full border border-white/25 bg-black/75 px-4 text-[15px] font-semibold text-white shadow-lg backdrop-blur-md active:scale-95">
+              <span className="text-xl leading-none">‹</span> Atrás
+            </button>
+            {showHome && (
+              <button onClick={leaveDesk} className="pointer-events-auto flex min-h-11 items-center gap-2 rounded-full border border-white/25 bg-black/75 px-4 text-[15px] font-semibold text-white shadow-lg backdrop-blur-md active:scale-95">
+                <HomeIcon /> Habitación
+              </button>
+            )}
+          </div>
+        )}
         {sw && (
-          <div className="pointer-events-none absolute left-3 top-3 z-30 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
-            <span className="animate-pulse-dot h-1.5 w-1.5 rounded-full bg-accent" />
+          <div className="pointer-events-none absolute bottom-3 left-3 z-50 flex items-center gap-2 rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-md">
+            <span className="animate-pulse-dot h-2 w-2 rounded-full bg-accent" />
             <span className="font-mono">
               <Elapsed since={sw.startedAt} />
             </span>
             <span className="text-white/60">{state.goals.find((g) => g.id === sw.goalId)?.name}</span>
           </div>
         )}
-        <div className="pointer-events-none absolute right-3 top-3 z-30 rounded-full bg-black/60 px-3 py-1 text-xs text-white/80 backdrop-blur-sm">
-          {SPRITE_LABELS[state.currentState]}
-        </div>
       </div>
 
       <main className="-mt-3 flex-1 rounded-t-3xl border-t border-line bg-bg px-4 pb-10 pt-4">
-        {crumbs.length > 0 && (
-          <nav aria-label="Navegación" className="mb-4 flex flex-wrap items-center gap-1.5 text-sm">
-            {crumbs.map((c, i) => (
-              <span key={c.label} className="flex items-center gap-1.5">
-                {i > 0 && <span className="text-muted">›</span>}
-                {c.onClick ? (
-                  <button onClick={c.onClick} className="rounded-lg px-1.5 py-0.5 text-accent hover:bg-raised">
-                    {i === 0 ? "← " : ""}
-                    {c.label}
-                  </button>
-                ) : (
-                  <span className="px-1.5 py-0.5 font-medium">{c.label}</span>
-                )}
-              </span>
-            ))}
-          </nav>
+        {!atHome && (
+          <div className="mb-4 flex items-center gap-2">
+            <button onClick={goBack} className="btn !min-h-11 !px-4 text-[15px]">
+              <span className="text-lg leading-none">‹</span> Atrás
+            </button>
+            {showHome && (
+              <button onClick={leaveDesk} className="btn !min-h-11 !px-4 text-[15px]">
+                <HomeIcon /> Habitación
+              </button>
+            )}
+            {nav.section && <h2 className="ml-auto text-base font-semibold">{SECTION_TITLE[nav.section]}</h2>}
+          </div>
         )}
         <div key={`${nav.scene}-${nav.section}`} className="animate-rise">
           {panel}
         </div>
-        {atHome && (
-          <p className="mt-6 text-center text-xs text-muted">
-            {doneCount}/{state.habits.length} hábitos hoy · toca el escritorio, el tablero o la cama
-          </p>
-        )}
       </main>
     </div>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9.5 10 3l7 6.5" />
+      <path d="M5 8.5V16h10V8.5" />
+      <path d="M8.5 16v-4.5h3V16" />
+    </svg>
   );
 }
 
@@ -239,16 +213,13 @@ function DeskMenu({ onPick }: { onPick: (k: DeskItem) => void }) {
     { k: "wallet", title: "Cartera", sub: "Monedas y tienda" },
   ];
   return (
-    <div>
-      <p className="section-title">Sobre la mesa</p>
-      <div className="grid grid-cols-2 gap-3">
-        {items.map((i) => (
-          <button key={i.k} onClick={() => onPick(i.k)} className="card text-left transition-colors hover:border-muted/60">
-            <p className="font-medium">{i.title}</p>
-            <p className="text-sm text-muted">{i.sub}</p>
-          </button>
-        ))}
-      </div>
+    <div className="grid grid-cols-2 gap-3">
+      {items.map((i) => (
+        <button key={i.k} onClick={() => onPick(i.k)} className="card text-left transition-colors hover:border-muted/60">
+          <p className="font-medium">{i.title}</p>
+          <p className="text-sm text-muted">{i.sub}</p>
+        </button>
+      ))}
     </div>
   );
 }

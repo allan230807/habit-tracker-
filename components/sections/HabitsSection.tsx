@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Heatmap from "@/components/Heatmap";
 import { Check } from "@/components/ui";
-import { STAT_LABELS } from "@/lib/gameLogic";
+import { HABIT_BONUS, STAT_KEYS, STAT_LABELS, habitBonusEarned } from "@/lib/gameLogic";
 import type { StatKey } from "@/lib/types";
 import type { SectionProps } from "./types";
 
@@ -11,6 +11,7 @@ export default function HabitsSection({ state, actions, today }: SectionProps) {
   const [name, setName] = useState("");
   const [stat, setStat] = useState<StatKey>("disciplina");
   const doneToday = state.habits.filter((h) => h.history.includes(today)).length;
+  const bonus = habitBonusEarned(state, today);
   const days = new Set(state.habits.flatMap((h) => h.history)).size;
 
   return (
@@ -37,6 +38,14 @@ export default function HabitsSection({ state, actions, today }: SectionProps) {
             {doneToday}/{state.habits.length}
           </span>
         </div>
+        <div
+          className={`mb-4 flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm ${
+            bonus ? "border-sand/50 bg-sand/10 text-sand" : "border-line text-muted"
+          }`}
+        >
+          <span>{bonus ? "¡Día completo!" : "Completa todos los hábitos de hoy"}</span>
+          <span className="font-mono">{bonus ? `+${HABIT_BONUS} ganadas` : `+${HABIT_BONUS} monedas`}</span>
+        </div>
         <ul className="space-y-3">
           {state.habits.map((h) => {
             const done = h.history.includes(today);
@@ -47,7 +56,6 @@ export default function HabitsSection({ state, actions, today }: SectionProps) {
                   {h.name}
                   <span className="ml-2 text-[11px] text-muted/70">{STAT_LABELS[h.stat]}</span>
                 </span>
-                <span className="font-mono text-xs text-sand">+1</span>
                 <button
                   aria-label={`Borrar ${h.name}`}
                   className="text-muted hover:text-rose"
@@ -73,7 +81,7 @@ export default function HabitsSection({ state, actions, today }: SectionProps) {
         >
           <input className="input flex-1 basis-40" placeholder="Nuevo hábito" value={name} onChange={(e) => setName(e.target.value)} />
           <select className="input !w-auto" value={stat} onChange={(e) => setStat(e.target.value as StatKey)} aria-label="Estadística">
-            {(Object.keys(STAT_LABELS) as StatKey[]).map((k) => (
+            {STAT_KEYS.map((k) => (
               <option key={k} value={k}>
                 {STAT_LABELS[k]}
               </option>

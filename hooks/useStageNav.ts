@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Cam } from "@/components/Stage";
 import { DESK_ITEMS, type DeskItem } from "@/lib/art/desk";
-import type { SpriteState } from "@/lib/types";
 
 export type Scene = "room" | "desk";
-export type Section = "habits" | "activity" | "goals" | "stats" | "todo" | "wallet";
+export type Section = "habits" | "goals" | "stats" | "todo" | "wallet";
 
 export interface Nav {
   scene: Scene;
@@ -15,28 +14,13 @@ export interface Nav {
   animate: boolean;
 }
 
-export const FULL: Cam = { s: 1, cx: 56, cy: 50 };
-/** Cámara que sigue al personaje según lo que esté haciendo. */
-export function camForSprite(state: SpriteState): Cam {
-  switch (state) {
-    case "praying":
-      return { s: 2.4, cx: 58, cy: 74 };
-    case "writing_board":
-      return { s: 2.1, cx: 56, cy: 66 };
-    case "working_macbook":
-      return { s: 2.1, cx: 78, cy: 74 };
-    default:
-      return ROOM_ZOOM.bed;
-  }
-}
-
+export const FULL: Cam = { s: 1, cx: 64, cy: 60 };
 export const ROOM_ZOOM = {
-  desk: { s: 2.3, cx: 88, cy: 79 },
-  board: { s: 2.7, cx: 62, cy: 45 },
-  bed: { s: 2.2, cx: 26, cy: 80 },
+  desk: { s: 2.4, cx: 106, cy: 95 },
+  board: { s: 2.8, cx: 100, cy: 53 },
 } satisfies Record<string, Cam>;
 
-const ITEM_SCALE: Record<DeskItem, number> = { macbook: 2.3, phone: 3.2, notebook: 3, wallet: 3.4 };
+const ITEM_SCALE: Record<DeskItem, number> = { macbook: 2.2, phone: 3.2, notebook: 3, wallet: 3.4 };
 const ITEM_SECTION: Record<DeskItem, Section> = { macbook: "goals", phone: "stats", notebook: "todo", wallet: "wallet" };
 
 const itemCam = (k: DeskItem): Cam => {

@@ -6,7 +6,8 @@ export type SpriteState =
   | "writing_board"
   | "working_macbook";
 
-export type StatKey = "fuerza" | "inteligencia" | "espiritu" | "disciplina";
+/** Categorías en las que ayuda un hábito o una meta (y estadísticas del personaje). */
+export type StatKey = "inteligencia" | "dinero" | "fuerza" | "espiritu" | "disciplina";
 
 export interface Habit {
   id: string;
@@ -19,6 +20,8 @@ export interface Habit {
 export interface Goal {
   id: string;
   name: string;
+  /** ¿En qué ayuda esta meta? Al cumplirla suma puntos a esa estadística. */
+  stat: StatKey;
   targetHours: number;
   currentHours: number;
 }
@@ -52,7 +55,6 @@ export interface JournalTask {
 export interface StopwatchState {
   goalId: string;
   startedAt: number;
-  prevState: SpriteState;
 }
 
 export interface CharacterStats {
@@ -66,7 +68,6 @@ export interface GameState {
   appStartDate: string;
   coins: number;
   characterStats: CharacterStats;
-  currentState: SpriteState;
   habits: Habit[];
   goals: Goal[];
   transactions: Transaction[];

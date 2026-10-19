@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useNow } from "@/hooks/useNow";
 import { ProgressBar } from "@/components/ui";
+import { STAT_KEYS, STAT_LABELS, goalReward, isGoalDone } from "@/lib/gameLogic";
+import type { StatKey } from "@/lib/types";
 import type { SectionProps } from "./types";
 
 const hours = (n: number) => (Math.round(n * 100) / 100).toString();
@@ -20,6 +22,7 @@ export default function GoalsSection({ state, actions }: SectionProps) {
   const [last, setLast] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [target, setTarget] = useState("100");
+  const [stat, setStat] = useState<StatKey | "">("");
 
   const selected = state.goals.some((g) => g.id === goalId) ? goalId : (state.goals[0]?.id ?? "");
   const running = sw ? state.goals.find((g) => g.id === sw.goalId) : null;
@@ -84,29 +87,34 @@ export default function GoalsSection({ state, actions }: SectionProps) {
 
       <section className="card">
         <h2 className="section-title">Metas</h2>
-        <ul className="space-y-4">
+        <ul className="space-y-5">
           {state.goals.map((g) => {
-            const done = g.currentHours >= g.targetHours;
+            const done = isGoalDone(g);
             return (
               <li key={g.id}>
                 <ProgressBar
                   value={g.currentHours}
                   max={g.targetHours}
                   tone={done ? "sand" : "accent"}
-                  label={`${g.name}${done ? " · completa" : ""}`}
+                  label={g.name}
                   right={`${hours(g.currentHours)} / ${hours(g.targetHours)} h · ${Math.min(
                     100,
                     Math.round((g.currentHours / g.targetHours) * 100),
                   )}%`}
                 />
-                <button
-                  className="mt-1 text-xs text-muted hover:text-rose"
-                  onClick={() => {
-                    if (confirm(`¿Borrar la meta «${g.name}»?`)) actions.removeGoal(g.id);
-                  }}
-                >
-                  Borrar
-                </button>
+                <div className="mt-1.5 flex items-center justify-between gap-2 text-xs">
+                  <span className={done ? "text-sand" : "text-muted"}>
+                    {done ? "Cumplida" : "Al cumplirla"} · +{goalReward(g)} {STAT_LABELS[g.stat]}
+                  </span>
+                  <button
+                    className="text-muted hover:text-rose"
+                    onClick={() => {
+                      if (confirm(`¿Borrar la meta «${g.name}»?`)) actions.removeGoal(g.id);
+                    }}
+                  >
+                    Borrar
+                  </button>
+                </div>
               </li>
             );
           })}
@@ -114,24 +122,49 @@ export default function GoalsSection({ state, actions }: SectionProps) {
         </ul>
 
         <form
-          className="mt-4 flex gap-2 border-t border-line pt-4"
+          className="mt-5 space-y-3 border-t border-line pt-4"
           onSubmit={(e) => {
             e.preventDefault();
-            actions.addGoal(name, Number(target));
+            if (!stat) return;
+            actions.addGoal(name, Number(target), stat);
             setName("");
+            setStat("");
           }}
         >
-          <input className="input" placeholder="Nueva meta" value={name} onChange={(e) => setName(e.target.value)} />
-          <input
-            className="input !w-20 text-center"
-            inputMode="decimal"
-            aria-label="Horas objetivo"
-            value={target}
-            onChange={(e) => setTarget(e.target.value)}
-          />
-          <button className="btn">Añadir</button>
+          <p className="text-sm font-medium">Nueva meta</p>
+          <div className="flex gap-2">
+            <input className="input" placeholder="¿Qué quieres lograr?" value={name} onChange={(e) => setName(e.target.value)} />
+            <input
+              className="input !w-20 text-center"
+              inputMode="decimal"
+              aria-label="Horas objetivo"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+            />
+          </div>
+          <div>
+            <p className="mb-2 text-sm">¿En qué ayuda esta meta?</p>
+            <div className="flex flex-wrap gap-2">
+              {STAT_KEYS.map((k) => (
+                <button
+                  type="button"
+                  key={k}
+                  onClick={() => setStat(k)}
+                  aria-pressed={stat === k}
+                  className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
+                    stat === k ? "border-accent bg-accent/15 text-accent" : "border-line bg-bg text-muted hover:border-muted"
+                  }`}
+                >
+                  {STAT_LABELS[k]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button className="btn btn-primary w-full" disabled={!name.trim() || !stat || !(Number(target) > 0)}>
+            Añadir meta
+          </button>
+          <p className="text-xs text-muted">Al cumplir la meta ganas puntos en esa categoría y subes de nivel. Cada 2 horas también suman medio punto.</p>
         </form>
-        <p className="mt-2 text-xs text-muted">Horas objetivo a la derecha. Al completar una meta tu escritorio sube de nivel.</p>
       </section>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { ProgressBar } from "@/components/ui";
-import { addDays, computeProgress, dayNumber, habitSuccess } from "@/lib/gameLogic";
+import { STAT_KEYS, STAT_LABELS, addDays, computeProgress, dayNumber, habitSuccess } from "@/lib/gameLogic";
 import type { SectionProps } from "./types";
 
 function Bar({ pct, color, label, title }: { pct: number; color: string; label: string; title: string }) {
@@ -45,11 +45,9 @@ export default function StatsSection({ state, today }: SectionProps) {
     return days.map((d) => ({ ...d, gainPct: (d.gain / max) * 100, spentPct: (d.spent / max) * 100 }));
   }, [state.transactions, today]);
 
+  const tones = ["sky", "sand", "rose", "accent", "sand"] as const;
   const rpg = [
-    { name: "Fuerza", value: p.fuerza, tone: "rose" as const },
-    { name: "Inteligencia", value: p.inteligencia, tone: "sky" as const },
-    { name: "Espíritu", value: p.espiritu, tone: "accent" as const },
-    { name: "Disciplina", value: p.discipline, tone: "sand" as const },
+    ...STAT_KEYS.map((k, i) => ({ name: STAT_LABELS[k], value: p.stats[k], tone: tones[i % tones.length] })),
     { name: "Enfoque (h)", value: p.focus, tone: "sky" as const },
   ];
   const rpgMax = Math.max(10, ...rpg.map((r) => r.value));
@@ -73,7 +71,7 @@ export default function StatsSection({ state, today }: SectionProps) {
             <ProgressBar key={r.name} value={r.value} max={rpgMax} tone={r.tone} label={r.name} right={String(r.value)} />
           ))}
         </div>
-        <p className="mt-4 text-xs text-muted">XP = horas×20 + hábitos×5 + tareas×3 + trotes×5. Las estadísticas suben con tus hábitos y tus horas de trabajo.</p>
+        <p className="mt-4 text-xs text-muted">Cada meta que cumples suma puntos a su categoría y XP. También suben con tus hábitos de esa categoría y tus horas de trabajo.</p>
       </section>
 
       <section className="card">

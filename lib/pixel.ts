@@ -103,6 +103,13 @@ export class Sprite {
     return this;
   }
 
+  /** Gira 90° en sentido horario. */
+  rotateCW() {
+    const o = new Sprite(this.h, this.w);
+    for (let y = 0; y < this.h; y++) for (let x = 0; x < this.w; x++) o.cells[x * o.w + (this.h - 1 - y)] = this.cells[y * this.w + x];
+    return o;
+  }
+
   mirror() {
     const o = new Sprite(this.w, this.h);
     for (let y = 0; y < this.h; y++) for (let x = 0; x < this.w; x++) o.cells[y * this.w + x] = this.cells[y * this.w + (this.w - 1 - x)];

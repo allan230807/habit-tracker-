@@ -1,66 +1,84 @@
 "use client";
 
-import { useMemo, type CSSProperties } from "react";
+import { useMemo, type CSSProperties, type ReactNode } from "react";
 import { Pixel } from "@/components/Pixel";
-import { poseFor } from "@/lib/art/character";
 import {
+  BED,
+  BOARD,
+  BOOKCASE,
+  CHAIR,
+  CUSHION,
+  DESK,
+  DESK_H,
+  DEPTH,
   FLOOR_H,
+  RUG as RUG_BOX,
   SCENE,
-  GLASS,
+  WINDOW,
+} from "@/lib/art/layout";
+import {
+  WIN_GLASS,
+  baseboard,
   bedBase,
   bedBlanket,
   board,
+  bookcase,
   cactus,
   car,
   chair,
   clock,
+  cushion,
   desk,
   deskLamp,
   deskTrinkets,
+  floor,
+  frame,
   laptopSide,
   monitor,
   rug,
-  shelf,
   streetGlass,
+  topPlant,
   windowFrame,
 } from "@/lib/art/room";
-import type { SpriteState } from "@/lib/types";
+import { useActorFrame } from "@/lib/actor/store";
 
 interface Props {
   u: number;
   day: boolean;
   hour: number;
   minute: number;
-  sprite: SpriteState;
   gamer: boolean;
   heat: (number | null)[][];
-  /** Mostrar las etiquetas de los puntos interactivos. */
-  labels: boolean;
+  /** Mostrar los puntos que indican qué objetos se pueden tocar. */
+  hints: boolean;
   onDesk: () => void;
   onBoard: () => void;
-  onBed: () => void;
 }
 
 // Sprites estáticos (se crean una sola vez).
-const BED = bedBase();
-const BLANKET = bedBlanket();
-const CHAIR = chair();
+const FLOOR = floor();
+const BASEBOARD = baseboard();
+const RUG = rug();
+const CUSHION_S = cushion();
+const BED_S = bedBase();
+const BLANKETS = { flat: bedBlanket("flat"), legs: bedBlanket("legs"), knees: bedBlanket("knees") };
+const CASE = bookcase(false);
+const CASE_GAP = bookcase(true);
+const CHAIR_S = chair();
+const DESK_S = desk(false);
+const DESK_GAMER = desk(true);
+const MONITOR = monitor();
 const LAPTOP = laptopSide();
 const TRINKETS = deskTrinkets();
 const LAMP = deskLamp();
-const SHELF = shelf();
-const RUG = rug();
-const CACTUS = cactus();
+const PLANT = topPlant();
 const FRAME = windowFrame();
-const MONITOR = monitor();
-const DESK = desk(false);
-const DESK_GAMER = desk(true);
+const CACTUS = cactus();
 const GLASS_DAY = streetGlass(true);
 const GLASS_NIGHT = streetGlass(false);
 const CAR_DAY = car(true);
 const CAR_NIGHT = car(false);
-
-const BED_STATES: SpriteState[] = ["durmiendo", "reading_bed", "scrolling_phone"];
+const FRAMES = [frame(0), frame(1)];
 
 interface PlaceProps {
   u: number;
@@ -68,7 +86,7 @@ interface PlaceProps {
   y: number;
   z?: number;
   style?: CSSProperties;
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 /** Posiciona por esquina inferior izquierda en px lógicos (y hacia arriba). */
@@ -80,6 +98,8 @@ function Place({ u, x, y, z = 1, style, children }: PlaceProps) {
   );
 }
 
+const SHADOW = (u: number, a = 0.18) => ({ filter: `drop-shadow(${u}px ${u}px 0 rgba(30,28,24,${a}))` });
+
 function Hotspot({
   u,
   x,
@@ -87,8 +107,8 @@ function Hotspot({
   w,
   h,
   label,
-  tag,
   show,
+  dot,
   onClick,
 }: {
   u: number;
@@ -97,127 +117,145 @@ function Hotspot({
   w: number;
   h: number;
   label: string;
-  tag: string;
   show: boolean;
+  /** Posición (px lógicos relativos al área) del punto indicador. */
+  dot: [number, number];
   onClick: () => void;
 }) {
   return (
     <button
       aria-label={label}
       onClick={onClick}
-      className="group absolute z-20 cursor-pointer rounded-sm outline-none transition-colors hover:bg-white/10 focus-visible:bg-white/10"
+      className="absolute z-40 cursor-pointer outline-none transition-colors hover:bg-white/10 focus-visible:bg-white/10"
       style={{ left: x * u, bottom: y * u, width: w * u, height: h * u }}
     >
-      <span
-        className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-medium tracking-wide text-white/90 backdrop-blur-sm transition-opacity"
-        style={{ opacity: show ? 1 : 0 }}
-      >
-        {tag}
-      </span>
+      {show && (
+        <span
+          className="animate-pulse-dot pointer-events-none absolute rounded-full border-2 border-white/90 bg-white/40 shadow-[0_0_8px_rgba(255,255,255,.7)]"
+          style={{ left: dot[0] * u - 6, bottom: dot[1] * u - 6, width: 12, height: 12 }}
+        />
+      )}
     </button>
   );
 }
 
-export default function RoomScene({ u, day, hour, minute, sprite, gamer, heat, labels, onDesk, onBoard, onBed }: Props) {
-  const pose = poseFor(sprite);
-  const inBed = BED_STATES.includes(sprite);
-  const boardSprite = useMemo(() => board(heat), [heat]);
-  const clockSprite = useMemo(() => clock(hour, minute), [hour, minute]);
-  const dim = (c: string) => c; // (los colores nocturnos se aplican con la capa de sombra)
-
-  const wall = day ? ["#ddd6c9", "#cfc8ba"] : ["#2b2f38", "#262a32"];
-  const floorA = day ? "#b48f69" : "#40362d";
-  const floorB = day ? "#a98560" : "#3a312a";
-  const trim = day ? "#f1ede4" : "#555a66";
-
+/** El personaje autónomo: es el único componente que se repinta a cada fotograma. */
+function Character({ u }: { u: number }) {
+  const f = useActorFrame();
+  if (!f) return null;
   return (
-    <div className="absolute inset-0" style={{ width: SCENE.w * u, height: SCENE.h * u }}>
-      {/* pared y piso */}
-      <div className="absolute inset-x-0 top-0" style={{ bottom: FLOOR_H * u, background: `linear-gradient(${wall[0]}, ${wall[1]})` }} />
-      <div
-        className="absolute inset-x-0 bottom-0"
-        style={{
-          height: FLOOR_H * u,
-          background: `repeating-linear-gradient(90deg, ${floorA} 0 ${14 * u}px, ${floorB} ${14 * u}px ${15 * u}px)`,
-          boxShadow: `inset 0 ${u * 3}px 0 rgba(0,0,0,.18)`,
-        }}
-      />
-      <div className="absolute inset-x-0" style={{ bottom: (FLOOR_H - 1) * u, height: 2 * u, background: trim, boxShadow: `0 ${u}px 0 rgba(0,0,0,.2)` }} />
-
-      <Place u={u} x={30} y={1} z={1}>
-        <Pixel sprite={RUG} u={u} />
+    <>
+      <Place u={u} x={f.left} y={f.bottom} z={f.layer === "front" ? 20 : 4}>
+        <Pixel sprite={f.sprite} u={u} />
       </Place>
-
-      {/* decoración de pared */}
-      <Place u={u} x={42} y={40} z={1}>
-        <Pixel sprite={boardSprite} u={u} style={{ filter: `drop-shadow(${u}px ${u}px 0 rgba(0,0,0,.22))` }} />
-      </Place>
-      <Place u={u} x={80} y={56} z={1}>
-        <Pixel sprite={SHELF} u={u} />
-      </Place>
-      <Place u={u} x={92} y={72} z={1}>
-        <Pixel sprite={clockSprite} u={u} />
-      </Place>
-
-      {/* cama + personaje */}
-      <Place u={u} x={2} y={3} z={2}>
-        <Pixel sprite={BED} u={u} style={{ filter: `drop-shadow(${u}px ${u}px 0 rgba(0,0,0,.2))` }} />
-      </Place>
-      <Place u={u} x={65} y={3} z={3}>
-        <Pixel sprite={CHAIR} u={u} />
-      </Place>
-      <Place u={u} x={pose.x} y={pose.y} z={4} style={{ transition: "left .5s steps(8), bottom .5s steps(8)" }}>
-        <div className="animate-breathe" style={{ "--u": `${u}px` } as CSSProperties}>
-          <Pixel sprite={pose.sprite} u={u} />
-        </div>
-      </Place>
-      <Place u={u} x={2} y={3} z={inBed ? 5 : 2}>
-        <Pixel sprite={BLANKET} u={u} />
-      </Place>
-      {sprite === "durmiendo" && (
+      {f.sleeping && (
         <span
-          className="animate-floaty pointer-events-none absolute z-10 font-medium text-white/80"
-          style={{ left: 16 * u, bottom: 30 * u, fontSize: Math.max(11, u * 4) }}
+          className="animate-floaty pointer-events-none absolute z-30 font-medium text-slate-500"
+          style={{ left: 36 * u, bottom: 40 * u, fontSize: Math.max(11, u * 3.6) }}
         >
           z z z
         </span>
       )}
+      <Place u={u} x={BED.x} y={BED.y} z={f.inBed ? 6 : 2}>
+        <Pixel sprite={f.sleeping ? BLANKETS.knees : f.bed === "propped" ? BLANKETS.legs : BLANKETS.flat} u={u} style={SHADOW(u, 0.1)} />
+      </Place>
+      <Place u={u} x={BOOKCASE.x} y={BOOKCASE.y} z={2}>
+        <Pixel sprite={f.bookGap ? CASE_GAP : CASE} u={u} style={SHADOW(u)} />
+      </Place>
+    </>
+  );
+}
 
-      {/* escritorio */}
-      <Place u={u} x={77} y={3} z={5}>
-        <Pixel sprite={gamer ? DESK_GAMER : DESK} u={u} style={{ filter: `drop-shadow(${u}px ${u}px 0 rgba(0,0,0,.2))` }} />
+export default function RoomScene({ u, day, hour, minute, gamer, heat, hints, onDesk, onBoard }: Props) {
+  const boardSprite = useMemo(() => board(heat), [heat]);
+  const clockSprite = useMemo(() => clock(hour, minute), [hour, minute]);
+  const wallTop = day ? "#f7f6f3" : "#f1f0ed";
+  const wallBot = day ? "#ebe9e4" : "#e6e4df";
+  const deskTop = DEPTH + DESK_H;
+
+  return (
+    <div className="absolute inset-0 overflow-hidden" style={{ width: SCENE.w * u, height: SCENE.h * u }}>
+      {/* pared blanca con luz suave arriba */}
+      <div className="absolute inset-x-0 top-0" style={{ bottom: (FLOOR_H - 2) * u, background: `linear-gradient(${wallTop}, ${wallBot})` }} />
+      <div
+        className="absolute inset-x-0 top-0"
+        style={{ height: 14 * u, background: "linear-gradient(rgba(0,0,0,.07), rgba(0,0,0,0))" }}
+      />
+      <Place u={u} x={0} y={0} z={0}>
+        <Pixel sprite={FLOOR} u={u} />
+      </Place>
+      <Place u={u} x={0} y={FLOOR_H - 2} z={1}>
+        <Pixel sprite={BASEBOARD} u={u} />
+      </Place>
+      <Place u={u} x={RUG_BOX.x} y={RUG_BOX.y} z={1}>
+        <Pixel sprite={RUG} u={u} />
+      </Place>
+
+      {/* decoración de pared */}
+      <Place u={u} x={BOARD.x} y={BOARD.y} z={1}>
+        <Pixel sprite={boardSprite} u={u} style={SHADOW(u, 0.22)} />
+      </Place>
+      <Place u={u} x={96} y={92} z={1}>
+        <Pixel sprite={FRAMES[0]} u={u} style={SHADOW(u)} />
+      </Place>
+      <Place u={u} x={114} y={90} z={1}>
+        <Pixel sprite={FRAMES[1]} u={u} style={SHADOW(u)} />
+      </Place>
+      <Place u={u} x={72} y={96} z={1}>
+        <Pixel sprite={clockSprite} u={u} />
+      </Place>
+      <Place u={u} x={BOOKCASE.x + 2} y={BOOKCASE.y + BOOKCASE.h} z={2}>
+        <Pixel sprite={PLANT} u={u} />
+      </Place>
+
+      {/* muebles */}
+      <Place u={u} x={BED.x} y={BED.y} z={2}>
+        <Pixel sprite={BED_S} u={u} style={SHADOW(u)} />
+      </Place>
+      <Place u={u} x={CUSHION.x} y={CUSHION.y} z={3}>
+        <Pixel sprite={CUSHION_S} u={u} />
+      </Place>
+      <Place u={u} x={CHAIR.x} y={CHAIR.y} z={3}>
+        <Pixel sprite={CHAIR_S} u={u} />
+      </Place>
+      <Place u={u} x={DESK.x} y={DESK.y} z={5}>
+        <Pixel sprite={gamer ? DESK_GAMER : DESK_S} u={u} style={SHADOW(u)} />
       </Place>
       {gamer && (
-        <Place u={u} x={94} y={23} z={6}>
+        <Place u={u} x={118} y={deskTop} z={6}>
           <Pixel sprite={MONITOR} u={u} />
         </Place>
       )}
-      <Place u={u} x={80} y={23} z={6}>
+      <Place u={u} x={101} y={deskTop - 1} z={6}>
         <Pixel sprite={LAPTOP} u={u} />
       </Place>
-      <Place u={u} x={93} y={23} z={6}>
+      <Place u={u} x={116} y={deskTop - 1} z={6}>
         <Pixel sprite={TRINKETS} u={u} />
       </Place>
-      <Place u={u} x={102} y={23} z={6}>
-        <Pixel sprite={LAMP} u={u} />
-      </Place>
+      {!gamer && (
+        <Place u={u} x={DESK.x + DESK.w - 11} y={deskTop - 1} z={6}>
+          <Pixel sprite={LAMP} u={u} />
+        </Place>
+      )}
+
+      <Character u={u} />
 
       {/* noche: sombra general (la ventana y las luces quedan por encima) */}
-      {!day && <div className="pointer-events-none absolute inset-0 z-[8]" style={{ background: "rgba(10,14,34,.38)" }} />}
+      {!day && <div className="pointer-events-none absolute inset-0 z-[30]" style={{ background: "rgba(14,20,48,.46)" }} />}
 
-      {/* ventana con la calle */}
-      <Place u={u} x={10 + GLASS.x} y={46 + 36 - GLASS.y - GLASS.h} z={9}>
-        <div className="relative overflow-hidden" style={{ width: GLASS.w * u, height: GLASS.h * u }}>
+      {/* ventana grande con la calle (un solo vidrio) */}
+      <Place u={u} x={WINDOW.x + WIN_GLASS.x} y={WINDOW.y + WINDOW.h - WIN_GLASS.y - WIN_GLASS.h} z={31}>
+        <div className="relative overflow-hidden" style={{ width: WIN_GLASS.w * u, height: WIN_GLASS.h * u }}>
           <Pixel sprite={day ? GLASS_DAY : GLASS_NIGHT} u={u} />
-          <div className="animate-drive absolute" style={{ top: 22 * u, left: 0, "--u": `${u}px` } as CSSProperties}>
+          <div className="animate-drive absolute" style={{ top: 33 * u, left: 0, "--u": `${u}px` } as CSSProperties}>
             <Pixel sprite={day ? CAR_DAY : CAR_NIGHT} u={u} />
           </div>
         </div>
       </Place>
-      <Place u={u} x={10} y={46} z={10}>
-        <Pixel sprite={FRAME} u={u} style={{ filter: `drop-shadow(${u}px ${u}px 0 rgba(0,0,0,.18))` }} />
+      <Place u={u} x={WINDOW.x} y={WINDOW.y} z={32}>
+        <Pixel sprite={FRAME} u={u} style={{ filter: `drop-shadow(${u}px ${u}px 0 rgba(30,28,24,.16))` }} />
       </Place>
-      <Place u={u} x={26} y={46 + 3} z={11}>
+      <Place u={u} x={WINDOW.x + 7} y={WINDOW.y + 4} z={33}>
         <Pixel sprite={CACTUS} u={u} />
       </Place>
 
@@ -225,33 +263,41 @@ export default function RoomScene({ u, day, hour, minute, sprite, gamer, heat, l
       {!day && (
         <>
           <div
-            className="pointer-events-none absolute z-[12]"
+            className="pointer-events-none absolute z-[34]"
             style={{
-              left: 86 * u,
-              bottom: 14 * u,
-              width: 30 * u,
-              height: 30 * u,
-              background: "radial-gradient(circle, rgba(255,214,140,.38), rgba(255,214,140,0) 68%)",
+              left: 100 * u,
+              bottom: (deskTop - 6) * u,
+              width: 40 * u,
+              height: 40 * u,
+              background: "radial-gradient(circle, rgba(255,214,140,.42), rgba(255,214,140,0) 66%)",
             }}
           />
           <div
-            className="pointer-events-none absolute z-[12]"
+            className="pointer-events-none absolute z-[34]"
             style={{
-              left: 70 * u,
-              bottom: 22 * u,
-              width: 24 * u,
-              height: 20 * u,
-              background: "radial-gradient(circle, rgba(170,215,255,.28), rgba(170,215,255,0) 68%)",
+              left: 90 * u,
+              bottom: (deskTop - 4) * u,
+              width: 30 * u,
+              height: 22 * u,
+              background: "radial-gradient(circle, rgba(170,215,255,.26), rgba(170,215,255,0) 68%)",
+            }}
+          />
+          <div
+            className="pointer-events-none absolute z-[34]"
+            style={{
+              left: 18 * u,
+              bottom: 14 * u,
+              width: 56 * u,
+              height: 52 * u,
+              background: "radial-gradient(ellipse, rgba(190,210,255,.22), rgba(190,210,255,0) 70%)",
             }}
           />
         </>
       )}
-      {void dim}
 
-      {/* zonas interactivas */}
-      <Hotspot u={u} x={62} y={3} w={50} h={37} label="Escritorio" tag="Escritorio" show={labels} onClick={onDesk} />
-      <Hotspot u={u} x={42} y={40} w={32} h={31} label="Tablero de hábitos" tag="Hábitos" show={labels} onClick={onBoard} />
-      <Hotspot u={u} x={2} y={3} w={44} h={30} label="Cama" tag="Cama" show={labels} onClick={onBed} />
+      {/* zonas interactivas (sin nombres, solo puntos que invitan a tocar) */}
+      <Hotspot u={u} x={DESK.x - 18} y={DEPTH - 2} w={SCENE.w - DESK.x + 18} h={DESK_H + 14} label="Escritorio" show={hints} dot={[40, DESK_H + 8]} onClick={onDesk} />
+      <Hotspot u={u} x={BOARD.x} y={BOARD.y} w={BOARD.w} h={BOARD.h} label="Tablero de hábitos" show={hints} dot={[BOARD.w / 2, BOARD.h - 4]} onClick={onBoard} />
     </div>
   );
 }
